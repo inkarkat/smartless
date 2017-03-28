@@ -104,6 +104,13 @@ done
 if IFS= read -r line; then
   if [[ "$SMARTLESS_CAPTURE_PREFIX" ]]; then
     TMPFILE=$(mktemp --tmpdir "${SMARTLESS_CAPTURE_PREFIX}-XXXXXX" 2>/dev/null || echo "${TEMP:-/tmp}/${SMARTLESS_CAPTURE_PREFIX}.$$")
+
+    if type -t rdfind >/dev/null; then
+      # Save disk space by de-duplicating previous (the current one may still be
+      # streamed in) captures via hard links.
+      rdfind -makehardlinks true -outputname /dev/null "${TMPFILE%${SMARTLESS_CAPTURE_PREFIX}-*}${SMARTLESS_CAPTURE_PREFIX}"-* &> /dev/null &
+    fi
+
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${TMPFILE})${SMARTLESS_COLOR_OFF}" 1>&2
     printf '%s\n%s\n' "$lines" "$line" > "$TMPFILE"
     { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$TMPFILE"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
