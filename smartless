@@ -104,6 +104,13 @@ done
 if IFS= read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
+
+    if type -t rdfind >/dev/null; then
+      # Save disk space by de-duplicating previous (the current one may still be
+      # streamed in) captures via hard links.
+      rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null &
+    fi
+
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}" 1>&2
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
     { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
