@@ -68,8 +68,10 @@ SMARTLESS_PAGER='less'
 # the default arguments to the pager
 SMARTLESS_PAGER_ARGUMENTS='-iR'
 
-# enable capturing of the full output to uniquely named files in the temp directory, using the configured prefix
-SMARTLESS_CAPTURE_PREFIX=
+# enable capturing of the full output to uniquely named files in the capture directory
+SMARTLESS_CAPTURE_DIR=
+# template for naming the capture files, cp. "man mktemp"
+SMARTLESS_CAPTURE_TEMPLATE=XXXXXX
 ```
 
 ## Contributing
