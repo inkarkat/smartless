@@ -39,6 +39,9 @@ fi
 # the default arguments to the pager
 [ -z "$SMARTLESS_PAGER_ARGUMENTS" ] && SMARTLESS_PAGER_ARGUMENTS='-iR'
 
+# skip when output is not to a terminal, but instead smartless is used inside a pipe
+[ -t 1 ] || exec cat
+
 # if a file name is passed, read it
 isfile=0
 file=""
