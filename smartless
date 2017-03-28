@@ -96,7 +96,7 @@ while [ $n -lt $nlines ] && IFS= read -r line; do
   else
     lines="$lines$newline$line"
   fi
-  printf '%s\n' "$line" 1>&2
+  printf '%s\n' "$line"
   n=$((n + 1))
 done
 
