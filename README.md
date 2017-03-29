@@ -71,7 +71,10 @@ SMARTLESS_PAGER_ARGUMENTS='-iR'
 # enable capturing of the full output to uniquely named files in the capture directory
 SMARTLESS_CAPTURE_DIR=
 # template for naming the capture files, cp. "man mktemp"
-SMARTLESS_CAPTURE_TEMPLATE=XXXXXX
+SMARTLESS_CAPTURE_TEMPLATE='XXXXXX'
+# clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here
+SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 ```
 
 ## Contributing

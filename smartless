@@ -39,6 +39,10 @@ fi
 # the default arguments to the pager
 [ -z "$SMARTLESS_PAGER_ARGUMENTS" ] && SMARTLESS_PAGER_ARGUMENTS='-iR'
 
+# clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here
+[ -z "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ] && SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
+
 # if a file name is passed, read it
 isfile=0
 file=""
@@ -105,11 +109,18 @@ if IFS= read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
 
-    if type -t rdfind >/dev/null; then
-      # Save disk space by de-duplicating previous (the current one may still be
-      # streamed in) captures via hard links.
-      rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null &
-    fi
+    # Run housekeeping jobs in the background, to avoid blocking the output.
+    (
+      if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
+        # Clean up old captures.
+        find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
+      fi
+      if type -t rdfind >/dev/null; then
+        # Save disk space by de-duplicating previous (the current one may still be
+        # streamed in) captures via hard links.
+        rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
+      fi
+    ) &
 
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}" 1>&2
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
