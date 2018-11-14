@@ -99,6 +99,7 @@ while [ $n -lt $nlines ] && IFS= read -r line; do
   printf '%s\n' "$line" 1>&2
   n=$((n + 1))
 done
+printf '%s' "$line"
 
 # if the input is longer, run the pager
 if IFS= read -r line; then
