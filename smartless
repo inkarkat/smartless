@@ -93,16 +93,20 @@ newline='
 while [ $n -lt $nlines ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
+    printf '%s' "$line" 1>&2
   else
     lines="$lines$newline$line"
+    printf '\n%s' "$line" 1>&2
   fi
-  printf '%s\n' "$line" 1>&2
+  line=''
   n=$((n + 1))
 done
-printf '%s' "$line"
+earlyIncompleteLine="$line"
 
 # if the input is longer, run the pager
 if IFS= read -r line; then
   echo -e "\033[38;5;2m... (more shown in $SMARTLESS_PAGER)\033[0m" 1>&2
   { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
+else
+  printf '\n%s%s' "$earlyIncompleteLine" "$line" 1>&2
 fi
