@@ -104,10 +104,10 @@ newline='
 while [ $n -lt $nlines ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
-    printf '%s' "$line" 1>&2
+    printf '%s' "$line"
   else
     lines="$lines$newline$line"
-    printf '\n%s' "$line" 1>&2
+    printf '\n%s' "$line"
   fi
   line=''
   n=$((n + 1))
@@ -132,13 +132,13 @@ if IFS= read -r line; then
       fi
     ) &
 
-    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}" 1>&2
+    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}"
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
     { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
   else
-    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}" 1>&2
+    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}"
     { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
   fi
 else
-  printf '\n%s%s' "$earlyIncompleteLine" "$line" 1>&2
+  printf '\n%s%s' "$earlyIncompleteLine" "$line"
 fi
