@@ -65,8 +65,7 @@ done
 
 if [ $# -gt 0 ]; then
   # cat file, and pass remaining arguments to myself
-  me=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
-  cat -- "$@" | $me "${lessArgs[@]}"
+  cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
   exit $?
 fi
 
