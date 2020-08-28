@@ -24,7 +24,7 @@
 
 # ------------------------------------------------------------------------------
 
-# number of lines to directly display before entering  the pager
+# number of lines to directly display before switching to less
 if [ -z "${SMARTLESS_NUM_LINES}" ] ; then
     # default to 5 lines less than the screen height, if it can be discovered
     SMARTLESS_NUM_LINES="$(tput lines)"
@@ -50,58 +50,35 @@ fi
 # arguments to "find" can be used here
 [ -z "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ] && SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 
-# if a file name is passed, read it
-isfile=0
-file=""
-args=""
-nextisarg=0
-for var in "$@"; do
-  if (( $nextisarg == 1 )); then
-    nextisarg=0
-    args="$args $var"
-    continue
-  fi
-  # ignore less arguments
-  if [[ ! $var = -* ]] && [[ ! $var = +* ]]; then
-    isfile=1
-    file=$var
-  else
-    if [[ $var == "-b" ]] ||
-       [[ $var == "-h" ]] ||
-       [[ $var == "-j" ]] ||
-       [[ $var == "-k" ]] ||
-       [[ $var == "-o" ]] ||
-       [[ $var == "-O" ]] ||
-       [[ $var == "-p" ]] ||
-       [[ $var == "-P" ]] ||
-       [[ $var == "-t" ]] ||
-       [[ $var == "-T" ]] ||
-       [[ $var == "-x" ]] ||
-       [[ $var == "-y" ]] ||
-       [[ $var == "-z" ]] ||
-       [[ $var == "-#" ]]; then
-      nextisarg=1
-    fi
-    args="$args $var"
-  fi
+typeset -a lessArgs=()
+while [ $# -ne 0 ]
+do
+  case "$1" in
+    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
+    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    --)                   shift; break;;
+    --*)                  lessArgs+=("$1"); shift;;
+    [-+]*)                lessArgs+=("$1"); shift;;
+    *)                    break;;
+  esac
 done
-if (( $isfile == 1 )); then
-  # cat file, and pass remaining arguments to myself
-  me=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
-  cat "$file" | $me $args
-  exit $?
-fi
 
-# number of lines to show before switching to less
-nlines=$SMARTLESS_NUM_LINES
+if [ $# -gt 0 ]; then
+  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
+    exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
+  else
+    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
+    exit $?
+  fi
+fi
 
 n=0
 lines=
 newline='
 '
 
-# read and display enough lines to fill most of the terminal (nlines many lines)
-while [ $n -lt $nlines ] && IFS= read -r line; do
+# read and display enough lines to fill most of the terminal
+while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
     printf '%s' "$line"
@@ -134,10 +111,10 @@ if IFS= read -r line; then
 
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}"
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
-    { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
+    { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   else
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}"
-    { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
+    { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
 else
   printf '\n%s%s' "$earlyIncompleteLine" "$line"
