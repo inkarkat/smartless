@@ -70,8 +70,6 @@ fi
 
 n=0
 lines=
-newline='
-'
 
 # read and display enough lines to fill most of the terminal
 while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
@@ -79,7 +77,7 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
     lines="$line"
     printf '%s' "$line"
   else
-    lines="$lines$newline$line"
+    lines="$lines"$'\n'"$line"
     printf '\n%s' "$line"
   fi
   line=''
