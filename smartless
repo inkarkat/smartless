@@ -35,6 +35,8 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
 
+[ -n "$COLUMNS" ] || COLUMNS=$(tput cols)
+
 : ${SMARTLESS_PAGER:=less} # pager to be used
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 
@@ -68,6 +70,13 @@ if [ $# -gt 0 ]; then
   fi
 fi
 
+
+countNetLines()
+{
+  local line="${1?}"; shift
+  printf '%s\n' "$line" | nowrap --columns=$COLUMNS --wrap | wc -l
+}
+
 n=0
 lines=
 
@@ -80,8 +89,8 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
     lines="$lines"$'\n'"$line"
     printf '\n%s' "$line"
   fi
+  n=$((n + $(countNetLines "$line")))
   line=''
-  n=$((n + 1))
 done
 earlyIncompleteLine="$line"
 
