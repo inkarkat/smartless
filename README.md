@@ -67,6 +67,10 @@ SMARTLESS_PAGER='less'
 
 # the default arguments to the pager
 SMARTLESS_PAGER_ARGUMENTS='-iR'
+
+# highlighting of messages
+SMARTLESS_COLOR="\033[38;5;2m"
+SMARTLESS_COLOR_OFF="\033[0m"
 ```
 
 ## Contributing
