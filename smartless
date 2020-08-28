@@ -50,45 +50,23 @@ fi
 # arguments to "find" can be used here
 [ -z "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ] && SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 
-# if a file name is passed, read it
-isfile=0
-file=""
-args=""
-nextisarg=0
-for var in "$@"; do
-  if (( $nextisarg == 1 )); then
-    nextisarg=0
-    args="$args $var"
-    continue
-  fi
-  # ignore less arguments
-  if [[ ! $var = -* ]] && [[ ! $var = +* ]]; then
-    isfile=1
-    file=$var
-  else
-    if [[ $var == "-b" ]] ||
-       [[ $var == "-h" ]] ||
-       [[ $var == "-j" ]] ||
-       [[ $var == "-k" ]] ||
-       [[ $var == "-o" ]] ||
-       [[ $var == "-O" ]] ||
-       [[ $var == "-p" ]] ||
-       [[ $var == "-P" ]] ||
-       [[ $var == "-t" ]] ||
-       [[ $var == "-T" ]] ||
-       [[ $var == "-x" ]] ||
-       [[ $var == "-y" ]] ||
-       [[ $var == "-z" ]] ||
-       [[ $var == "-#" ]]; then
-      nextisarg=1
-    fi
-    args="$args $var"
-  fi
+typeset -a lessArgs=()
+while [ $# -ne 0 ]
+do
+  case "$1" in
+    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
+    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    --)                   lessArgs+=("$1"); shift; break;;
+    --*)                  lessArgs+=("$1"); shift;;
+    [-+]*)                lessArgs+=("$1"); shift;;
+    *)                    break;;
+  esac
 done
-if (( $isfile == 1 )); then
+
+if [ $# -gt 0 ]; then
   # cat file, and pass remaining arguments to myself
   me=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)/`basename "${BASH_SOURCE[0]}"`
-  cat "$file" | $me $args
+  cat -- "$@" | $me "${lessArgs[@]}"
   exit $?
 fi
 
@@ -134,10 +112,10 @@ if IFS= read -r line; then
 
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}"
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
-    { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
+    { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   else
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}"
-    { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "$@"
+    { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
 else
   printf '\n%s%s' "$earlyIncompleteLine" "$line"
