@@ -89,9 +89,12 @@ Pull-requests to improve `smartless` are welcomed.
 
 This project was originally based on [an answer on StackExchange](http://unix.stackexchange.com/questions/107315/), but has changed significantly since.
 
+This is an independently maintained fork of the original version by Stefan Heule.
+
 ## License
 
 > Copyright (c) 2015, Stefan Heule
+> Copyright (c) 2017-2020 Ingo Karkat
 
 > Licensed under the **Apache License, Version 2.0** (the "License");
 you may not use this file except in compliance with the License.
