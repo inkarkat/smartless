@@ -2,9 +2,9 @@
 
 # smartless - a pager similar to less, but smarter
 #
-# works like the pager 'less', but does not enter the pager mode if the
-# document is short
-# inspired by code at http://unix.stackexchange.com/questions/107315/
+# Works like the pager 'less', but does not enter the pager mode if the document
+# is short.
+# Inspired by http://unix.stackexchange.com/questions/107315/
 
 # ------------------------------------------------------------------------------
 
@@ -25,25 +25,25 @@
 
 # ------------------------------------------------------------------------------
 
-# skip when output is not to a terminal, but instead smartless is used inside a pipe
+# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
 [ -t 1 ] || exec cat
 
-# number of lines to directly display before switching to less
+# Number of lines to directly display before switching to less.
 if [ -z "$SMARTLESS_NUM_LINES" ] ; then
-    # default to 5 lines less than the screen height, if it can be discovered
+    # Default to 5 lines less than the screen height.
     [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
 
-: ${SMARTLESS_PAGER:=less} # the pager to be used
-: ${SMARTLESS_PAGER_ARGUMENTS=-iR} # the default arguments to the pager
+: ${SMARTLESS_PAGER:=less} # pager to be used
+: ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 
-# highlighting of messages
+# Highlighting of messages.
 : ${SMARTLESS_COLOR='\033[38;5;2m'}
 : ${SMARTLESS_COLOR_OFF='\033[0m'}
 
-# clean up captured output after it hasn't been accessed for 14 days; any
-# arguments to "find" can be used here
+# Clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
 typeset -a lessArgs=()
@@ -71,7 +71,7 @@ fi
 n=0
 lines=
 
-# read and display enough lines to fill most of the terminal
+# Read and display enough lines to fill most of the terminal.
 while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
@@ -85,7 +85,7 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
 done
 earlyIncompleteLine="$line"
 
-# if the input is longer, run the pager
+# If the input is longer, run the pager.
 if IFS= read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
