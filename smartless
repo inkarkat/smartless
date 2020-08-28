@@ -24,7 +24,7 @@
 
 # ------------------------------------------------------------------------------
 
-# number of lines to directly display before entering  the pager
+# number of lines to directly display before switching to less
 if [ -z "${SMARTLESS_NUM_LINES}" ] ; then
     # default to 5 lines less than the screen height, if it can be discovered
     SMARTLESS_NUM_LINES="$(tput lines)"
@@ -69,16 +69,13 @@ if [ $# -gt 0 ]; then
   exit $?
 fi
 
-# number of lines to show before switching to less
-nlines=$SMARTLESS_NUM_LINES
-
 n=0
 lines=
 newline='
 '
 
-# read and display enough lines to fill most of the terminal (nlines many lines)
-while [ $n -lt $nlines ] && IFS= read -r line; do
+# read and display enough lines to fill most of the terminal
+while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
     printf '%s' "$line"
