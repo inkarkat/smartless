@@ -71,10 +71,9 @@ if [ $# -gt 0 ]; then
 fi
 
 
+typeset -a NOWRAP=()
 countNetLines()
 {
-  local line="${1?}"; shift
-
   # To get an upper bound for the line width without invoking external commands,
   # expand tabs to 8 spaces and turn everything but non-printable ASCII
   # characters into two spaces (so, assume it's a double-width character).
@@ -84,11 +83,24 @@ countNetLines()
   lineWidth=${#lineWidth}
 
   if [ $lineWidth -le $COLUMNS ]; then
-    printf 1
+    let n+=1
     return
   fi
 
-  printf '%s\n' "$line" | nowrap --columns=$COLUMNS --wrap | wc -l
+
+  # Lazily start a coproc to filter individual lines; this is much more
+  # efficient than starting a new process for each line.
+  if [ ${#NOWRAP[@]} -eq 0 ]; then
+    coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
+  fi
+
+  local wrappedLine
+  printf '%s\n' "$line" >&"${NOWRAP[1]}"
+
+  while read -r -t 0.1 -u "${NOWRAP[0]}" wrappedLine
+  do
+    let n+=1
+  done
 }
 
 n=0
@@ -103,10 +115,17 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
     lines="$lines"$'\n'"$line"
     printf '\n%s' "$line"
   fi
-  n=$((n + $(countNetLines "$line")))
+  countNetLines
   line=''
 done
 earlyIncompleteLine="$line"
+
+if [ ${#NOWRAP[@]} -gt 0 ]; then
+  # Close the coproc as it isn't used any longer and doesn't need to hang around
+  # while the pager runs.
+  eval "exec ${NOWRAP[1]}>&-"
+fi
+
 
 # If the input is longer, run the pager.
 if IFS= read -r line; then
