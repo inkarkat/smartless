@@ -2,13 +2,14 @@
 
 # smartless - a pager similar to less, but smarter
 #
-# works like the pager 'less', but does not enter the pager mode if the
-# document is short
-# inspired by code at http://unix.stackexchange.com/questions/107315/
+# Works like the pager 'less', but does not enter the pager mode if the document
+# is short.
+# Inspired by http://unix.stackexchange.com/questions/107315/
 
 # ------------------------------------------------------------------------------
 
 # Copyright 2015 Stefan Heule
+# Copyright 2017-2020 Ingo Karkat
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,31 +25,26 @@
 
 # ------------------------------------------------------------------------------
 
-# number of lines to directly display before switching to less
-if [ -z "${SMARTLESS_NUM_LINES}" ] ; then
-    # default to 5 lines less than the screen height, if it can be discovered
-    SMARTLESS_NUM_LINES="$(tput lines)"
-    SMARTLESS_NUM_LINES="${SMARTLESS_NUM_LINES:+$(( SMARTLESS_NUM_LINES - 5 ))}"
-    # fall back to 15 lines
-    SMARTLESS_NUM_LINES="${SMARTLESS_NUM_LINES:-15}"
-fi
-
-# the pager to be used
-[ -z "$SMARTLESS_PAGER" ] && SMARTLESS_PAGER='less'
-
-# the default arguments to the pager
-[ -z "$SMARTLESS_PAGER_ARGUMENTS" ] && SMARTLESS_PAGER_ARGUMENTS='-iR'
-
-# skip when output is not to a terminal, but instead smartless is used inside a pipe
+# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
 [ -t 1 ] || exec cat
 
-# highlighting of messages
-[ -z "$SMARTLESS_COLOR" ] && SMARTLESS_COLOR="\033[38;5;2m"
-[ -z "$SMARTLESS_COLOR_OFF" ] && SMARTLESS_COLOR_OFF="\033[0m"
+# Number of lines to directly display before switching to less.
+if [ -z "$SMARTLESS_NUM_LINES" ] ; then
+    # Default to 5 lines less than the screen height.
+    [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
+    SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
+fi
 
-# clean up captured output after it hasn't been accessed for 14 days; any
-# arguments to "find" can be used here
-[ -z "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ] && SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
+: ${SMARTLESS_PAGER:=less} # pager to be used
+: ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
+
+# Highlighting of messages.
+: ${SMARTLESS_COLOR='\033[38;5;2m'}
+: ${SMARTLESS_COLOR_OFF='\033[0m'}
+
+# Clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here.
+: ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
 typeset -a lessArgs=()
 while [ $# -ne 0 ]
@@ -74,16 +70,14 @@ fi
 
 n=0
 lines=
-newline='
-'
 
-# read and display enough lines to fill most of the terminal
+# Read and display enough lines to fill most of the terminal.
 while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
     printf '%s' "$line"
   else
-    lines="$lines$newline$line"
+    lines="$lines"$'\n'"$line"
     printf '\n%s' "$line"
   fi
   line=''
@@ -91,7 +85,7 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
 done
 earlyIncompleteLine="$line"
 
-# if the input is longer, run the pager
+# If the input is longer, run the pager.
 if IFS= read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
