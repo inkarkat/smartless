@@ -8,7 +8,7 @@ Here is a small demo, and I have also written a [blog post](http://stefanheule.c
 
 ## Prerequisites
 
-`smartless` requires a reasonable resent version of `bash`, and a pager like `less`.  Both are available by default on most unix systems.
+`smartless` requires a reasonable recent version of `bash`, and a pager like `less`.  Both are available by default on most Unix systems.
 
 ## Installation
 
@@ -83,7 +83,7 @@ SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 
 ## Contributing
 
-Pull-requests to improve `smartless` are welcomed.
+Pull-requests to improve `smartless` are welcome.
 
 ## Credits
 
