@@ -56,7 +56,7 @@ do
   case "$1" in
     -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
-    --)                   lessArgs+=("$1"); shift; break;;
+    --)                   shift; break;;
     --*)                  lessArgs+=("$1"); shift;;
     [-+]*)                lessArgs+=("$1"); shift;;
     *)                    break;;
@@ -64,9 +64,12 @@ do
 done
 
 if [ $# -gt 0 ]; then
-  # cat file, and pass remaining arguments to myself
-  cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
-  exit $?
+  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
+    exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
+  else
+    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
+    exit $?
+  fi
 fi
 
 n=0
