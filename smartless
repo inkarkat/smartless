@@ -25,6 +25,9 @@
 
 # ------------------------------------------------------------------------------
 
+# skip when output is not to a terminal, but instead smartless is used inside a pipe
+[ -t 1 ] || exec cat
+
 # number of lines to directly display before switching to less
 if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     # default to 5 lines less than the screen height, if it can be discovered
@@ -32,22 +35,16 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
 
-# the pager to be used
-[ -z "$SMARTLESS_PAGER" ] && SMARTLESS_PAGER='less'
-
-# the default arguments to the pager
-[ -z "$SMARTLESS_PAGER_ARGUMENTS" ] && SMARTLESS_PAGER_ARGUMENTS='-iR'
-
-# skip when output is not to a terminal, but instead smartless is used inside a pipe
-[ -t 1 ] || exec cat
+: ${SMARTLESS_PAGER:=less} # the pager to be used
+: ${SMARTLESS_PAGER_ARGUMENTS=-iR} # the default arguments to the pager
 
 # highlighting of messages
-[ -z "$SMARTLESS_COLOR" ] && SMARTLESS_COLOR="\033[38;5;2m"
-[ -z "$SMARTLESS_COLOR_OFF" ] && SMARTLESS_COLOR_OFF="\033[0m"
+: ${SMARTLESS_COLOR='\033[38;5;2m'}
+: ${SMARTLESS_COLOR_OFF='\033[0m'}
 
 # clean up captured output after it hasn't been accessed for 14 days; any
 # arguments to "find" can be used here
-[ -z "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ] && SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
+: ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
 typeset -a lessArgs=()
 while [ $# -ne 0 ]
