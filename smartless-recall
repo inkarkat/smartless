@@ -1,0 +1,58 @@
+#!/bin/bash
+
+shopt -qs extglob
+
+printUsage()
+{
+    cat <<HELPTEXT
+Recall previous N'th smartless output, or the latest one matching PATTERN.
+HELPTEXT
+printf 'Usage: %q %s\n' "$(basename "$1")" '[N|PATTERN] [-?|-h|--help]'
+}
+case "$1" in
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+esac
+
+if [ ! "$SMARTLESS_CAPTURE_DIR" ]; then
+    echo >&2 "ERROR: \$SMARTLESS_CAPTURE_DIR is not defined."
+    exit 2
+elif [ ! -d "$SMARTLESS_CAPTURE_DIR" ]; then
+    echo >&2 "ERROR: The \$SMARTLESS_CAPTURE_DIR ($SMARTLESS_CAPTURE_DIR) does not exist."
+    exit 2
+fi
+
+IFS=$'\n'
+typeset -a captures=($(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*))
+if [ ${#captures[@]} -eq 0 ]; then
+    echo >&2 "ERROR: No captured outputs in $SMARTLESS_CAPTURE_DIR"
+    exit 2
+fi
+
+
+
+recallByNumber()
+{
+    printf %s "${captures[$1 - 1]}"
+}
+
+recallGrep()
+{
+    grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | head -n 1
+}
+
+case "$1" in
+    '')		filespec="$(recallByNumber 1)";;
+    +([0-9]))	filespec="$(recallByNumber "$1")";;
+    *)		filespec="$(recallGrep "$@")";;
+esac
+
+if [ ! "$filespec" ]; then
+    echo >&2 "ERROR: No such captured output."
+    exit 1
+fi
+
+# Do not use $PAGER (i.e. smartless) here; this would create another duplicate
+# capture that messes up the N addressing (and is a bit wasteful). As only long
+# output is captured, anyway, we can definitely use the real pager that
+# smartless uses as well.
+exec "${SMARTLESS_PAGER:-less}" ${SMARTLESS_PAGER_ARGUMENTS:-} "$filespec"

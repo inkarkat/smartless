@@ -71,6 +71,14 @@ SMARTLESS_PAGER_ARGUMENTS='-iR'
 # highlighting of messages
 SMARTLESS_COLOR="\033[38;5;2m"
 SMARTLESS_COLOR_OFF="\033[0m"
+
+# enable capturing of the full output to uniquely named files in the capture directory
+SMARTLESS_CAPTURE_DIR=
+# template for naming the capture files, cp. "man mktemp"
+SMARTLESS_CAPTURE_TEMPLATE='XXXXXX'
+# clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here
+SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 ```
 
 ## Contributing
