@@ -111,7 +111,7 @@ n=0
 lines=
 
 # Read and display enough lines to fill most of the terminal.
-while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
+while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS=$'\n' read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
     printf '%s' "$line"
@@ -132,7 +132,7 @@ fi
 
 
 # If the input is longer, run the pager.
-if IFS= read -r line; then
+if IFS=$'\n' read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
 
