@@ -10,6 +10,8 @@ Here is a small demo, and I have also written a [blog post](http://stefanheule.c
 
 `smartless` requires a reasonable recent version of `bash`, and a pager like `less`.  Both are available by default on most Unix systems.
 
+To consider wrapping of lines that are longer than the terminal width the [`nowrap` command](https://github.com/goodell/nowrap) is needed. Without it, full physical lines will be counted, and this can lead to scrolling of output in the terminal.
+
 ## Installation
 
 The simplest way to install the script is to download it directly into /usr/local/bin:

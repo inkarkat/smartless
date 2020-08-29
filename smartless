@@ -35,6 +35,8 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
 
+[ -n "$COLUMNS" ] || COLUMNS=$(tput cols)
+
 : ${SMARTLESS_PAGER:=less} # pager to be used
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 
@@ -68,11 +70,55 @@ if [ $# -gt 0 ]; then
   fi
 fi
 
+
+if type -t nowrap >/dev/null; then
+  typeset -a NOWRAP=()
+  countNetLines()
+  {
+    # To get an upper bound for the line width without invoking external commands,
+    # expand tabs to 8 spaces and turn everything but non-printable ASCII
+    # characters into two spaces (so, assume it's a double-width character).
+    local lineWidth="${line//	/        }"
+    lineWidth="${lineWidth//[\{\}]/x}"  # Somehow cannot include these in the negative collection, so turn them into an ASCII character.
+    lineWidth="${lineWidth//[^ -z]/  }"
+    lineWidth=${#lineWidth}
+
+    if [ $lineWidth -le $COLUMNS ]; then
+      let n+=1
+      return
+    fi
+
+
+    # Lazily start a coproc to filter individual lines; this is much more
+    # efficient than starting a new process for each line.
+    if [ ${#NOWRAP[@]} -eq 0 ]; then
+      coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
+    fi
+
+    # Append an empty line; the single line's wrapped output will never create a
+    # fully empty line on its own, so when we read an empty line, we know that the
+    # end of the current wrapped line has been reached.
+    printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
+
+    local wrappedLine
+    while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine
+    do
+      [ -z "$wrappedLine" ] && return # Reached end of the wrapped line.
+      let n+=1
+    done
+  }
+else
+  countNetLines()
+  {
+    let n+=1
+  }
+fi
+
 n=0
 lines=
 
 # Read and display enough lines to fill most of the terminal.
-while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
+while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS=$'\n' read -r line; do
   if [[ $n -eq 0 ]]; then
     lines="$line"
     printf '%s' "$line"
@@ -80,13 +126,20 @@ while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS= read -r line; do
     lines="$lines"$'\n'"$line"
     printf '\n%s' "$line"
   fi
+  countNetLines
   line=''
-  n=$((n + 1))
 done
 earlyIncompleteLine="$line"
 
+if [ ${#NOWRAP[@]} -gt 0 ]; then
+  # Close the coproc as it isn't used any longer and doesn't need to hang around
+  # while the pager runs.
+  eval "exec ${NOWRAP[1]}>&-"
+fi
+
+
 # If the input is longer, run the pager.
-if IFS= read -r line; then
+if IFS=$'\n' read -r line; then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
 
