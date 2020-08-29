@@ -71,41 +71,48 @@ if [ $# -gt 0 ]; then
 fi
 
 
-typeset -a NOWRAP=()
-countNetLines()
-{
-  # To get an upper bound for the line width without invoking external commands,
-  # expand tabs to 8 spaces and turn everything but non-printable ASCII
-  # characters into two spaces (so, assume it's a double-width character).
-  local lineWidth="${line//	/        }"
-  lineWidth="${lineWidth//[\{\}]/x}"  # Somehow cannot include these in the negative collection, so turn them into an ASCII character.
-  lineWidth="${lineWidth//[^ -z]/  }"
-  lineWidth=${#lineWidth}
+if type -t nowrap >/dev/null; then
+  typeset -a NOWRAP=()
+  countNetLines()
+  {
+    # To get an upper bound for the line width without invoking external commands,
+    # expand tabs to 8 spaces and turn everything but non-printable ASCII
+    # characters into two spaces (so, assume it's a double-width character).
+    local lineWidth="${line//	/        }"
+    lineWidth="${lineWidth//[\{\}]/x}"  # Somehow cannot include these in the negative collection, so turn them into an ASCII character.
+    lineWidth="${lineWidth//[^ -z]/  }"
+    lineWidth=${#lineWidth}
 
-  if [ $lineWidth -le $COLUMNS ]; then
+    if [ $lineWidth -le $COLUMNS ]; then
+      let n+=1
+      return
+    fi
+
+
+    # Lazily start a coproc to filter individual lines; this is much more
+    # efficient than starting a new process for each line.
+    if [ ${#NOWRAP[@]} -eq 0 ]; then
+      coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
+    fi
+
+    # Append an empty line; the single line's wrapped output will never create a
+    # fully empty line on its own, so when we read an empty line, we know that the
+    # end of the current wrapped line has been reached.
+    printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
+
+    local wrappedLine
+    while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine
+    do
+      [ -z "$wrappedLine" ] && return # Reached end of the wrapped line.
+      let n+=1
+    done
+  }
+else
+  countNetLines()
+  {
     let n+=1
-    return
-  fi
-
-
-  # Lazily start a coproc to filter individual lines; this is much more
-  # efficient than starting a new process for each line.
-  if [ ${#NOWRAP[@]} -eq 0 ]; then
-    coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
-  fi
-
-  # Append an empty line; the single line's wrapped output will never create a
-  # fully empty line on its own, so when we read an empty line, we know that the
-  # end of the current wrapped line has been reached.
-  printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
-
-  local wrappedLine
-  while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine
-  do
-    [ -z "$wrappedLine" ] && return # Reached end of the wrapped line.
-    let n+=1
-  done
-}
+  }
+fi
 
 n=0
 lines=
