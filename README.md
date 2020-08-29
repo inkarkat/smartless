@@ -16,12 +16,12 @@ To consider wrapping of lines that are longer than the terminal width the [`nowr
 
 The simplest way to install the script is to download it directly into /usr/local/bin:
 
-    curl https://raw.githubusercontent.com/stefanheule/smartless/master/smartless -o /usr/local/bin/smartless
+    curl https://raw.githubusercontent.com/inkarkat/smartless/master/smartless -o /usr/local/bin/smartless
     chmod +x /usr/local/bin/smartless # <-- mark it as executable
 
 Alternatively, you can clone the git repository, which allows easy updating by doing `git pull`:
 
-    git clone https://github.com/stefanheule/smartless.git
+    git clone https://github.com/inkarkat/smartless.git
     ln -s smartless/smartless /usr/local/bin/smartless # <-- make it available system-wide as "smartless"
     
 See also the [aliases](#aliases) section below.
