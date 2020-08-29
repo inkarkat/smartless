@@ -14,7 +14,7 @@ To consider wrapping of lines that are longer than the terminal width the [`nowr
 
 ## Installation
 
-The simplest way to install the script is to download it directly into /usr/local/bin:
+The simplest way to install the script is to download it directly into `/usr/local/bin`:
 
     curl https://raw.githubusercontent.com/inkarkat/smartless/master/smartless -o /usr/local/bin/smartless
     chmod +x /usr/local/bin/smartless # <-- mark it as executable
@@ -71,8 +71,8 @@ SMARTLESS_PAGER='less'
 SMARTLESS_PAGER_ARGUMENTS='-iR'
 
 # highlighting of messages
-SMARTLESS_COLOR="\033[38;5;2m"
-SMARTLESS_COLOR_OFF="\033[0m"
+SMARTLESS_COLOR='\033[38;5;2m'
+SMARTLESS_COLOR_OFF='\033[0m'
 
 # enable capturing of the full output to uniquely named files in the capture directory
 SMARTLESS_CAPTURE_DIR=
