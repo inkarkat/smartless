@@ -94,11 +94,15 @@ countNetLines()
     coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
   fi
 
-  local wrappedLine
-  printf '%s\n' "$line" >&"${NOWRAP[1]}"
+  # Append an empty line; the single line's wrapped output will never create a
+  # fully empty line on its own, so when we read an empty line, we know that the
+  # end of the current wrapped line has been reached.
+  printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
 
-  while read -r -t 0.1 -u "${NOWRAP[0]}" wrappedLine
+  local wrappedLine
+  while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine
   do
+    [ -z "$wrappedLine" ] && return # Reached end of the wrapped line.
     let n+=1
   done
 }
