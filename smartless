@@ -163,6 +163,8 @@ if IFS=$'\n' read -r line; then
     echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}"
     { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
+elif [ $n -eq 0 ]; then
+  printf '%s%s' "$earlyIncompleteLine" "$line"
 else
   printf '\n%s%s' "$earlyIncompleteLine" "$line"
 fi
