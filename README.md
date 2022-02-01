@@ -71,8 +71,8 @@ SMARTLESS_PAGER='less'
 SMARTLESS_PAGER_ARGUMENTS='-iR'
 
 # highlighting of messages
-SMARTLESS_COLOR='\033[38;5;2m'
-SMARTLESS_COLOR_OFF='\033[0m'
+SMARTLESS_COLOR=$'\e[38;5;2m'
+SMARTLESS_COLOR_OFF=$'\e[0m'
 
 # enable capturing of the full output to uniquely named files in the capture directory
 SMARTLESS_CAPTURE_DIR=
@@ -96,7 +96,7 @@ This is an independently maintained fork of the original version by Stefan Heule
 ## License
 
 > Copyright (c) 2015, Stefan Heule
-> Copyright (c) 2017-2020 Ingo Karkat
+> Copyright (c) 2017-2022 Ingo Karkat
 
 > Licensed under the **Apache License, Version 2.0** (the "License");
 you may not use this file except in compliance with the License.

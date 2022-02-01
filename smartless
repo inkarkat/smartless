@@ -41,8 +41,8 @@ fi
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 
 # Highlighting of messages.
-: ${SMARTLESS_COLOR='\033[38;5;2m'}
-: ${SMARTLESS_COLOR_OFF='\033[0m'}
+: ${SMARTLESS_COLOR=$'\e[38;5;2m'}
+: ${SMARTLESS_COLOR_OFF=$'\e[0m'}
 
 # Clean up captured output after it hasn't been accessed for 14 days; any
 # arguments to "find" can be used here.
@@ -156,11 +156,11 @@ if IFS=$'\n' read -r line; then
       fi
     ) &
 
-    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER, captured in ${captureFilespec})${SMARTLESS_COLOR_OFF}"
+    printf '%s... (more shown in %s, captured in %s)%s\n' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
     { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   else
-    echo -e "${SMARTLESS_COLOR}... (more shown in $SMARTLESS_PAGER)${SMARTLESS_COLOR_OFF}"
+    printf '%s... (more shown in %s)%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$SMARTLESS_COLOR_OFF"
     { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
 elif [ $n -eq 0 ]; then
