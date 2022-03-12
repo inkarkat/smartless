@@ -21,8 +21,7 @@ elif [ ! -d "$SMARTLESS_CAPTURE_DIR" ]; then
     exit 2
 fi
 
-IFS=$'\n'
-typeset -a captures=($(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*))
+readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
 if [ ${#captures[@]} -eq 0 ]; then
     echo >&2 "ERROR: No captured outputs in $SMARTLESS_CAPTURE_DIR"
     exit 2
