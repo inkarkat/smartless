@@ -5,9 +5,12 @@ shopt -qs extglob
 printUsage()
 {
     cat <<HELPTEXT
-Recall previous N'th smartless output, or the latest one matching PATTERN.
+Recall previous N'th smartless output, or the one where the capture file name
+contains *NAME-GLOB*, or the latest one where the captured contents match
+(grep-style) PATTERN / GREP-ARGS.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" '[N|PATTERN] [-?|-h|--help]'
+    echo
+    printf 'Usage: %q %s\n' "$(basename "$1")" '[N|NAME-GLOB|PATTERN|GREP-ARGS ...] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
@@ -31,7 +34,7 @@ fi
 
 recallByNumber()
 {
-    printf %s "${captures[$1 - 1]}"
+    printf %s "${captures[${1:?} - 1]}"
 }
 
 recallGrep()
@@ -42,11 +45,16 @@ recallGrep()
 case "$1" in
     '')		filespec="$(recallByNumber 1)";;
     +([0-9]))	filespec="$(recallByNumber "$1")";;
-    *)		filespec="$(recallGrep "$@")";;
+    *)		if [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "${captures[@]}") && [ ${#filespecs[@]} -eq 1 ]; then
+		    filespec="${filespecs[0]}"
+		else
+		    filespec="$(recallGrep "$@")"
+		fi
+		;;
 esac
 
-if [ ! "$filespec" ]; then
-    echo >&2 "ERROR: No such captured output."
+if [ -z "$filespec" ]; then
+    echo >&2 'ERROR: No such captured output.'
     exit 1
 fi
 
