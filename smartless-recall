@@ -5,9 +5,10 @@ shopt -qs extglob
 printUsage()
 {
     cat <<HELPTEXT
-Recall previous N'th smartless output, or the latest one matching PATTERN.
+Recall previous N'th smartless output, or the latest one where the captured
+contents match (grep-style) PATTERN / GREP-ARGS.
 HELPTEXT
-printf 'Usage: %q %s\n' "$(basename "$1")" '[N|PATTERN] [-?|-h|--help]'
+printf 'Usage: %q %s\n' "$(basename "$1")" '[N|PATTERN|GREP-ARGS] [-?|-h|--help]'
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
