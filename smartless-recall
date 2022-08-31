@@ -24,28 +24,31 @@ elif [ ! -d "$SMARTLESS_CAPTURE_DIR" ]; then
     exit 2
 fi
 
-readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
-if [ ${#captures[@]} -eq 0 ]; then
-    echo >&2 "ERROR: No captured outputs in $SMARTLESS_CAPTURE_DIR"
-    exit 2
-fi
-
-
+getCaptures()
+{
+    readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
+    if [ ${#captures[@]} -eq 0 ]; then
+	printf >&2 'ERROR: No captured outputs in %s\n' "$SMARTLESS_CAPTURE_DIR"
+	exit 2
+    fi
+}
 
 recallByNumber()
 {
+    getCaptures
     printf %s "${captures[${1:?} - 1]}"
 }
 
 recallGrep()
 {
+    getCaptures	# Note: Cannot simply use $SMARTLESS_CAPTURE_DIR/* glob here because we want to return a match in the newest capture.
     grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | head -n 1
 }
 
 case "$1" in
     '')		filespec="$(recallByNumber 1)";;
     +([0-9]))	filespec="$(recallByNumber "$1")";;
-    *)		if [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "${captures[@]}") && [ ${#filespecs[@]} -eq 1 ]; then
+    *)		if [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
 		    filespec="${filespecs[0]}"
 		else
 		    filespec="$(recallGrep "$@")"
