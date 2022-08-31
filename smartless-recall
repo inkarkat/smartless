@@ -6,11 +6,11 @@ printUsage()
 {
     cat <<HELPTEXT
 Recall previous N'th smartless output, or the one where the capture file name
-contains *NAME-GLOB*, or the latest one where the captured contents match
+is NAME / contains *NAME-GLOB*, or the latest one where the captured contents match
 (grep-style) PATTERN / GREP-ARGS.
 HELPTEXT
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" '[N|NAME-GLOB|PATTERN|GREP-ARGS ...] [-?|-h|--help]'
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[N|NAME|NAME-GLOB|PATTERN|GREP-ARGS ...] [-?|-h|--help]"
 }
 case "$1" in
     --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
@@ -48,7 +48,9 @@ recallGrep()
 case "$1" in
     '')		filespec="$(recallByNumber 1)";;
     +([0-9]))	filespec="$(recallByNumber "$1")";;
-    *)		if [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
+    *)		if [ $# -eq 1 ] && filespec="${SMARTLESS_CAPTURE_DIR}/$1" && [ -r "$filespec" ]; then
+		    : # Directly take the NAME.
+		elif [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
 		    filespec="${filespecs[0]}"
 		else
 		    filespec="$(recallGrep "$@")"
