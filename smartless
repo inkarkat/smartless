@@ -156,11 +156,11 @@ if IFS=$'\n' read -r line; then
       fi
     ) &
 
-    printf '%s... (more shown in %s, captured in %s)%s\n' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
+    printf '%s... recall full output via $ mr %q%s\n' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
     printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
     { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   else
-    printf '%s... (more shown in %s)%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$SMARTLESS_COLOR_OFF"
+    printf '%s... (full output truncated)%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
     { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
 elif [ $n -eq 0 ]; then
