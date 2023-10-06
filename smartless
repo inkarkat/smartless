@@ -48,26 +48,33 @@ fi
 # arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
+hasStdin=
 typeset -a lessArgs=()
+typeset -a filespecs=()
 while [ $# -ne 0 ]
 do
   case "$1" in
     -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    -)                    filespecs+=("$1"); shift; hasStdin=t;;
     --)                   shift; break;;
     --*)                  lessArgs+=("$1"); shift;;
     [-+]*)                lessArgs+=("$1"); shift;;
-    *)                    break;;
+    *)                    filespecs+=("$1"); shift;;
   esac
 done
+set -- "${filespecs[@]}" "$@"
 
-if [ $# -gt 0 ]; then
+if [ $# -gt 0 ] && [ ! "$hasStdin" ]; then
   if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
     exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
   else
     cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
     exit $?
   fi
+elif [ "$hasStdin" -a $# -gt 1 ]; then
+  echo >&2 "ERROR: Mixed stdin (-) and FILE arguments not supported."
+  exit 2
 fi
 
 
