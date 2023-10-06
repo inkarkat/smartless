@@ -48,25 +48,41 @@ fi
 # arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
+hasNonFiles=
 typeset -a lessArgs=()
+typeset -a filespecs=()
 while [ $# -ne 0 ]
 do
   case "$1" in
     -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
     --)                   shift; break;;
     --*)                  lessArgs+=("$1"); shift;;
     [-+]*)                lessArgs+=("$1"); shift;;
-    *)                    break;;
+    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
   esac
 done
+set -- "${filespecs[@]}" "$@"
 
-if [ $# -gt 0 ]; then
+delegateToPager()
+{
+  exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
+}
+
+if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
   if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
-    exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
+    delegateToPager "$@"
   else
     cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
     exit $?
+  fi
+elif [ "$hasNonFiles" ]; then
+  if [ $# -gt 1 ]; then
+    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
+  elif [ "$1" != '-' ]; then
+    # stdin will be read automatically; other non-regular file needs to be opened.
+    exec < "$1"
   fi
 fi
 
