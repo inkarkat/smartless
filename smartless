@@ -82,7 +82,7 @@ elif [ "$hasNonFiles" ]; then
     delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
   elif [ "$1" != '-' ]; then
     # stdin will be read automatically; other non-regular file needs to be opened.
-    exec < "$1"
+    exec < "$1" || exit $?
   fi
 fi
 
