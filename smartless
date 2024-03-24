@@ -86,6 +86,11 @@ elif [ "$hasNonFiles" ]; then
   fi
 fi
 
+addeol()
+{
+  sed -e '$a\'
+}
+
 estimateLineCount()
 {
   local line="${1?}"; shift
@@ -142,21 +147,31 @@ else
   }
 fi
 
-n=0
-shownCompleteLines=
+readonly endLineNum=$((SMARTLESS_NUM_LINES / 2))  # One surplus line goes to the end.
+readonly beginLineNum=$((SMARTLESS_NUM_LINES - endLineNum))
 
+# Read and display enough lines to fill (almost) half of the terminal.
+shownLineCnt=0
+shownCompleteLines=
+wrappedLineCnt=0
+isTruncated=
 lineRemainder=
-# Read and display enough lines to fill most of the terminal.
+physicalLineCnt=0
 while IFS=$'\n' read -r line; do
+  let physicalLineCnt+=1
   countNetLines
-  if [ $((n + netLineCnt)) -lt $SMARTLESS_NUM_LINES ]; then
+  if [ $((shownLineCnt + netLineCnt)) -lt $beginLineNum ]; then
     shownCompleteLines+="${line}"$'\n'
     printf '%s\n' "$line"
     line=''
-    let n+=netLineCnt
+    let shownLineCnt+=netLineCnt
+    let wrappedLineCnt+=netLineCnt-1
   else
     # Too long; only print what fits the terminal and show in full in pager.
-    countNetLines $((SMARTLESS_NUM_LINES - n)); [ -z "$netLines" ] || printf '%s\n' "$netLines"
+    availableLines=$((beginLineNum - shownLineCnt))
+    countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+    let wrappedLineCnt+=availableLines-1
+    [ $availableLines -lt $netLineCnt ] && isTruncated=t
     lineRemainder="$line"$'\n'
     line=''
     break
@@ -165,22 +180,19 @@ done
 # Incomplete line without newline.
 if [ -n "$line" ]; then
   countNetLines
-  if [ $((n + netLineCnt)) -lt $SMARTLESS_NUM_LINES ]; then
+  if [ $((shownLineCnt + netLineCnt)) -lt $beginLineNum ]; then
     # Short enough to show completely.
     earlyIncompleteLine="$line"
     line=''
   else
     # Too long; only print what fits the terminal and show in full in pager.
-    countNetLines $((SMARTLESS_NUM_LINES - n)); [ -z "$netLines" ] || printf '%s\n' "$netLines"
+    availableLines=$((beginLineNum - shownLineCnt))
+    countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+    let wrappedLineCnt+=availableLines-1
+    [ $availableLines -lt $netLineCnt ] && isTruncated=t
     lineRemainder="$line"
     line=''
   fi
-fi
-
-if [ ${#NOWRAP[@]} -gt 0 ]; then
-  # Close the coproc as it isn't used any longer and doesn't need to hang around
-  # while the pager runs.
-  eval "exec ${NOWRAP[1]}>&-"
 fi
 
 
@@ -204,19 +216,69 @@ then
       fi
     ) &
 
-    printf '%s... recall full output via $ mr %q%s\n' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
-    printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
-    typeset -a consumer=(tee -a "$captureFilespec")
+    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
   else
-    typeset -a consumer=(cat)
-    printf '%s... (full output truncated)%s\n' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
+    captureFilespec="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+    trap 'rm -f -- "$captureFilespec" 2>/dev/null' EXIT
+    printf -v truncationMessage '%s... (full output truncated) ...%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
   fi
+  printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
 
   {
     printf '%s%s' "$shownCompleteLines" "$line"
-    exec "${consumer[@]}"
+    tee --append -- "$captureFilespec"
   } \
-    | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+    | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+
+
+  # Fill the second half of the terminal with trailing lines.
+  # The handling of wrapped lines only works forward, so we need to reverse both
+  # lines and characters. Therefore, these cannot be directly printed, but need
+  # to be collected and reversed again. The algorithm is the same as at the
+  # front, but we don't need to handle incomplete lines without a newline here.
+  collectedLineCnt=0
+  collectedLines=''
+  collectedLinesWithoutTruncation=''
+  while IFS=$'\n' read -r line; do
+    countNetLines
+    if [ $((collectedLineCnt + netLineCnt)) -le $((endLineNum + 1)) ]; then
+      collectedLinesWithoutTruncation="${collectedLines}${line}"$'\n'
+    fi
+    if [ $((collectedLineCnt + netLineCnt)) -le $endLineNum ]; then
+      collectedLines+="${line}"$'\n'
+      let collectedLineCnt+=netLineCnt
+      let wrappedLineCnt+=netLineCnt-1
+    else
+      # Too long; only collect what fits the terminal.
+      availableLines=$((endLineNum - collectedLineCnt + 1))
+      countNetLines $availableLines; collectedLines+="$netLines"
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      break
+    fi
+  done < <(
+    tail --lines=+$physicalLineCnt -- "$captureFilespec" \
+      | tail --lines=$((endLineNum + 1)) \
+      | addeol \
+      | rev | tac
+  )
+  # Don't repeat (full) physical lines already shown from the beginning. A long
+  # line that is truncated may have parts of its content shown both before and
+  # after the truncation message!
+  # Reverse both lines and characters.
+
+  totalLineNum=$(addeol < "$captureFilespec" | wc --lines)  # wc does not count incomplete lines.
+  if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
+    printf '%s\n' "$truncationMessage"
+  elif [ ! "$isTruncated" ]; then
+    collectedLines="$collectedLinesWithoutTruncation"
+  fi
+  printf %s "$collectedLines" | rev | tac # Undo the reversal of both lines and characters.
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
+fi
+
+if [ ${#NOWRAP[@]} -gt 0 ]; then
+  # Close the coproc.
+  eval "exec ${NOWRAP[1]}>&-"
 fi
