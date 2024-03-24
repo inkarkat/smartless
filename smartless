@@ -204,11 +204,17 @@ then
 
     printf '%s... recall full output via $ mr %q%s\n' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
     printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
-    { printf '%s%s' "$shownCompleteLines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+    typeset -a consumer=(tee -a "$captureFilespec")
   else
+    typeset -a consumer=(cat)
     printf '%s... (full output truncated)%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
-    { printf '%s%s' "$shownCompleteLines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
+
+  {
+    printf '%s%s' "$shownCompleteLines" "$line"
+    exec "${consumer[@]}"
+  } \
+    | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
 fi
