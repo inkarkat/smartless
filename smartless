@@ -156,9 +156,7 @@ shownCompleteLines=
 wrappedLineCnt=0
 isTruncated=
 lineRemainder=
-physicalLineCnt=0
 while IFS=$'\n' read -r line; do
-  let physicalLineCnt+=1
   countNetLines
   if [ $((shownLineCnt + netLineCnt)) -lt $beginLineNum ]; then
     shownCompleteLines+="${line}"$'\n'
@@ -239,6 +237,11 @@ then
   collectedLineCnt=0
   collectedLines=''
   collectedLinesWithoutTruncation=''
+
+  # Don't repeat content already shown from the beginning.
+  alreadyShownContent="${shownCompleteLines}${netLines}"
+  byteOffset=$(printf %s "$alreadyShownContent" | wc --bytes)
+
   while IFS=$'\n' read -r line; do
     countNetLines
     if [ $((collectedLineCnt + netLineCnt)) -le $((endLineNum + 1)) ]; then
@@ -257,16 +260,11 @@ then
       break
     fi
   done < <(
-    tail --lines=+$physicalLineCnt -- "$captureFilespec" \
+    tail --bytes=+$((byteOffset + 1)) -- "$captureFilespec" \
       | tail --lines=$((endLineNum + 1)) \
       | addeol \
-      | rev | tac
+      | rev | tac # Reverse both lines and characters.
   )
-  # Don't repeat (full) physical lines already shown from the beginning. A long
-  # line that is truncated may have parts of its content shown both before and
-  # after the truncation message!
-  # Reverse both lines and characters.
-
   totalLineNum=$(addeol < "$captureFilespec" | wc --lines)  # wc does not count incomplete lines.
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
     printf '%s\n' "$truncationMessage"
