@@ -103,10 +103,8 @@ if type -t nowrap >/dev/null; then
   typeset -a NOWRAP=()
   countNetLines()
   {
-    if [ $(estimateLineCount "$line") -le 1 ]; then
-      let n+=1
-      return
-    fi
+    netLines=$(estimateLineCount "$line")
+    [ $netLines -le 1 ] && return
 
 
     # Lazily start a coproc to filter individual lines; this is much more
@@ -120,11 +118,10 @@ if type -t nowrap >/dev/null; then
     # end of the current wrapped line has been reached.
     printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
 
-    local wrappedLine
-    while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine
+    local wrappedLine netLines=0
+    while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
     do
-      [ -z "$wrappedLine" ] && return # Reached end of the wrapped line.
-      let n+=1
+      let netLines+=1
     done
   }
 else
@@ -132,7 +129,7 @@ else
   {
     # Manually remove ANSI escape sequences.
     # The estimate errs on the larger side.
-    let n+=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
+    let netLines=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
   }
 fi
 
@@ -142,7 +139,7 @@ shownCompleteLines=
 lineRemainder=
 # Read and display enough lines to fill most of the terminal.
 while IFS=$'\n' read -r line; do
-  countNetLines
+  countNetLines; let n+=netLines
   if [ $n -lt $SMARTLESS_NUM_LINES ]; then
     shownCompleteLines+="${line}"$'\n'
     printf '%s\n' "$line"
@@ -156,7 +153,7 @@ while IFS=$'\n' read -r line; do
 done
 # Incomplete line without newline.
 if [ -n "$line" ]; then
-  countNetLines
+  countNetLines; let n+=netLines
   if [ $n -lt $SMARTLESS_NUM_LINES ]; then
     # Short enough to show completely.
     earlyIncompleteLine="$line"
