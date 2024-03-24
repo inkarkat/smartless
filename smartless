@@ -104,7 +104,7 @@ if type -t nowrap >/dev/null; then
   countNetLines()
   {
     netLines=$(estimateLineCount "$line")
-    [ $netLines -le 1 ] && return
+    [ $# -eq 0 -a $netLines -le 1 ] && return
 
 
     # Lazily start a coproc to filter individual lines; this is much more
@@ -122,6 +122,9 @@ if type -t nowrap >/dev/null; then
     while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
     do
       let netLines+=1
+      if [ $# -gt 0 ] && [ $netLines -lt $1 ]; then
+        printf %s "$wrappedLine"
+      fi
     done
   }
 else
@@ -130,6 +133,10 @@ else
     # Manually remove ANSI escape sequences.
     # The estimate errs on the larger side.
     let netLines=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
+
+    if [ $# -gt 0 ]; then
+      printf %s "${line:0:$((($1 - 1) * COLUMNS))}"
+    fi
   }
 fi
 
@@ -146,7 +153,8 @@ while IFS=$'\n' read -r line; do
     line=''
     let n+=netLines
   else
-    # Too long; show remainder in pager.
+    # Too long; only print what fits the terminal and show in full in pager.
+    countNetLines $((SMARTLESS_NUM_LINES - n))
     lineRemainder="$line"$'\n'
     line=''
     break
@@ -160,7 +168,8 @@ if [ -n "$line" ]; then
     earlyIncompleteLine="$line"
     line=''
   else
-    # Too long; omit and only show in pager.
+    # Too long; only print what fits the terminal and show in full in pager.
+    countNetLines $((SMARTLESS_NUM_LINES - n))
     lineRemainder="$line"
     line=''
   fi
