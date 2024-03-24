@@ -103,8 +103,8 @@ if type -t nowrap >/dev/null; then
   typeset -a NOWRAP=()
   countNetLines()
   {
-    netLines=$(estimateLineCount "$line")
-    [ $# -eq 0 -a $netLines -le 1 ] && return
+    netLineCnt=$(estimateLineCount "$line")
+    [ $# -eq 0 -a $netLineCnt -le 1 ] && return
 
 
     # Lazily start a coproc to filter individual lines; this is much more
@@ -118,12 +118,14 @@ if type -t nowrap >/dev/null; then
     # end of the current wrapped line has been reached.
     printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
 
-    local wrappedLine netLines=0
+    local wrappedLine
+    netLineCnt=0
+    netLines=''
     while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
     do
-      let netLines+=1
-      if [ $# -gt 0 ] && [ $netLines -lt $1 ]; then
-        printf %s "$wrappedLine"
+      let netLineCnt+=1
+      if [ $# -gt 0 ] && [ $netLineCnt -lt $1 ]; then
+        netLines+="$wrappedLine"
       fi
     done
   }
@@ -132,10 +134,10 @@ else
   {
     # Manually remove ANSI escape sequences.
     # The estimate errs on the larger side.
-    let netLines=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
+    let netLineCnt=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
 
     if [ $# -gt 0 ]; then
-      printf %s "${line:0:$((($1 - 1) * COLUMNS))}"
+      netLines+="${line:0:$((($1 - 1) * COLUMNS))}"
     fi
   }
 fi
@@ -147,14 +149,14 @@ lineRemainder=
 # Read and display enough lines to fill most of the terminal.
 while IFS=$'\n' read -r line; do
   countNetLines
-  if [ $((n + netLines)) -lt $SMARTLESS_NUM_LINES ]; then
+  if [ $((n + netLineCnt)) -lt $SMARTLESS_NUM_LINES ]; then
     shownCompleteLines+="${line}"$'\n'
     printf '%s\n' "$line"
     line=''
-    let n+=netLines
+    let n+=netLineCnt
   else
     # Too long; only print what fits the terminal and show in full in pager.
-    countNetLines $((SMARTLESS_NUM_LINES - n))
+    countNetLines $((SMARTLESS_NUM_LINES - n)); [ -z "$netLines" ] || printf '%s\n' "$netLines"
     lineRemainder="$line"$'\n'
     line=''
     break
@@ -163,13 +165,13 @@ done
 # Incomplete line without newline.
 if [ -n "$line" ]; then
   countNetLines
-  if [ $((n + netLines)) -lt $SMARTLESS_NUM_LINES ]; then
+  if [ $((n + netLineCnt)) -lt $SMARTLESS_NUM_LINES ]; then
     # Short enough to show completely.
     earlyIncompleteLine="$line"
     line=''
   else
     # Too long; only print what fits the terminal and show in full in pager.
-    countNetLines $((SMARTLESS_NUM_LINES - n))
+    countNetLines $((SMARTLESS_NUM_LINES - n)); [ -z "$netLines" ] || printf '%s\n' "$netLines"
     lineRemainder="$line"
     line=''
   fi
