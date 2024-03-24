@@ -131,16 +131,36 @@ else
 fi
 
 n=0
-lines=
+shownCompleteLines=
 
+lineRemainder=
 # Read and display enough lines to fill most of the terminal.
-while [ $n -lt $SMARTLESS_NUM_LINES ] && IFS=$'\n' read -r line; do
-  lines+="${lines:+$'\n'}${line}"
-  printf '%s\n' "$line"
+while IFS=$'\n' read -r line; do
   countNetLines
-  line=''
+  if [ $n -lt $SMARTLESS_NUM_LINES ]; then
+    shownCompleteLines+="${line}"$'\n'
+    printf '%s\n' "$line"
+    line=''
+  else
+    # Too long; show remainder in pager.
+    lineRemainder="$line"$'\n'
+    line=''
+    break
+  fi
 done
-earlyIncompleteLine="$line"
+# Incomplete line without newline.
+if [ -n "$line" ]; then
+  countNetLines
+  if [ $n -lt $SMARTLESS_NUM_LINES ]; then
+    # Short enough to show completely.
+    earlyIncompleteLine="$line"
+    line=''
+  else
+    # Too long; omit and only show in pager.
+    lineRemainder="$line"
+    line=''
+  fi
+fi
 
 if [ ${#NOWRAP[@]} -gt 0 ]; then
   # Close the coproc as it isn't used any longer and doesn't need to hang around
@@ -150,7 +170,9 @@ fi
 
 
 # If the input is longer, run the pager.
-if IFS=$'\n' read -r line; then
+if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
+  || { IFS=$'\n' read -r line && line+=$'\n'; }
+then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
 
@@ -168,11 +190,11 @@ if IFS=$'\n' read -r line; then
     ) &
 
     printf '%s... recall full output via $ mr %q%s\n' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
-    printf '%s\n%s\n' "$lines" "$line" > "$captureFilespec"
-    { printf '%s\n%s\n' "$lines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+    printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
+    { printf '%s%s' "$shownCompleteLines" "$line"; exec tee -a "$captureFilespec"; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   else
     printf '%s... (full output truncated)%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
-    { printf '%s\n%s\n' "$lines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+    { printf '%s%s' "$shownCompleteLines" "$line"; exec cat; } | exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
   fi
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
