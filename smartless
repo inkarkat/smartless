@@ -139,11 +139,12 @@ shownCompleteLines=
 lineRemainder=
 # Read and display enough lines to fill most of the terminal.
 while IFS=$'\n' read -r line; do
-  countNetLines; let n+=netLines
-  if [ $n -lt $SMARTLESS_NUM_LINES ]; then
+  countNetLines
+  if [ $((n + netLines)) -lt $SMARTLESS_NUM_LINES ]; then
     shownCompleteLines+="${line}"$'\n'
     printf '%s\n' "$line"
     line=''
+    let n+=netLines
   else
     # Too long; show remainder in pager.
     lineRemainder="$line"$'\n'
@@ -153,8 +154,8 @@ while IFS=$'\n' read -r line; do
 done
 # Incomplete line without newline.
 if [ -n "$line" ]; then
-  countNetLines; let n+=netLines
-  if [ $n -lt $SMARTLESS_NUM_LINES ]; then
+  countNetLines
+  if [ $((n + netLines)) -lt $SMARTLESS_NUM_LINES ]; then
     # Short enough to show completely.
     earlyIncompleteLine="$line"
     line=''
