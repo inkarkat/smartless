@@ -207,7 +207,7 @@ then
     typeset -a consumer=(tee -a "$captureFilespec")
   else
     typeset -a consumer=(cat)
-    printf '%s... (full output truncated)%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
+    printf '%s... (full output truncated)%s\n' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
   fi
 
   {
