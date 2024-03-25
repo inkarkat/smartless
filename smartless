@@ -266,6 +266,18 @@ then
       | rev | tac # Reverse both lines and characters.
   )
   totalLineNum=$(addeol < "$captureFilespec" | wc --lines)  # wc does not count incomplete lines.
+
+  if [ "$isTruncated" ]; then
+    # Check whether the already shown content plus the collected content for
+    # trailing lines makes up the entire file. If that's the case, there's been
+    # wrapping, but no truncation.
+    tmpCollectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
+    tmpCollectedLines="${tmpCollectedLines%$'\n'}"
+    tmpCollectedBytes=$(printf %s "$tmpCollectedLines" | wc --bytes)
+    totalBytes="$(wc --bytes -- "$captureFilespec")"; totalBytes=${totalBytes%% *}
+    ((byteOffset + tmpCollectedBytes == totalBytes)) && isTruncated=
+  fi
+
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
     printf '%s\n' "$truncationMessage"
   elif [ ! "$isTruncated" ]; then
