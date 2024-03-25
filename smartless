@@ -58,6 +58,10 @@ do
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
     -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
     --)                   shift; break;;
+    --quit-if-one-screen|-F)
+                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
+                          shift
+                          ;;
     --*)                  lessArgs+=("$1"); shift;;
     [-+]*)                lessArgs+=("$1"); shift;;
     *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
