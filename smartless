@@ -41,7 +41,7 @@ fi
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 
 # Highlighting of messages.
-: ${SMARTLESS_COLOR=$'\e[38;5;2m'}
+: ${SMARTLESS_COLOR=$'\e[0;38;5;2m'}
 : ${SMARTLESS_COLOR_OFF=$'\e[0m'}
 
 # Clean up captured output after it hasn't been accessed for 14 days; any
