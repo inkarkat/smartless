@@ -48,6 +48,7 @@ fi
 # arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
+readonly SCRIPT_PID=$$
 hasNonFiles=
 typeset -a lessArgs=()
 typeset -a filespecs=()
@@ -108,7 +109,18 @@ estimateLineCount()
   printf %d $(((lineWidth - 1) / COLUMNS + 1))
 }
 
+prePagerPipelineStep=
 if type -t nowrap >/dev/null; then
+  killUselessPager()
+  {
+    tee  >(
+      wrappedLineNum=$(nowrap --columns="$COLUMNS" --wrap | wc --lines)
+      [ -n "$wrappedLineNum" ] && [ $wrappedLineNum -le $SMARTLESS_NUM_LINES ] \
+          && pkill --parent "$SCRIPT_PID" --exact -- "$SMARTLESS_PAGER"
+    )
+  }
+  prePagerPipelineStep=killUselessPager
+
   typeset -a NOWRAP=()
   countNetLines()
   {
@@ -226,10 +238,14 @@ then
   fi
   printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
 
+  feedPager()
   {
     printf '%s%s' "$shownCompleteLines" "$line"
     tee --append -- "$captureFilespec"
-  } \
+  }
+
+  eval 'feedPager' \
+    "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
     | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
 
 
