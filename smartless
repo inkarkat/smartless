@@ -144,10 +144,10 @@ if type -t nowrap >/dev/null; then
     netLines=''
     while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
     do
-      let netLineCnt+=1
       if [ $# -gt 0 ] && [ $netLineCnt -lt $1 ]; then
         netLines+="$wrappedLine"
       fi
+      let netLineCnt+=1
     done
   }
 else
