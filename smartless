@@ -162,7 +162,7 @@ isTruncated=
 lineRemainder=
 while IFS=$'\n' read -r line; do
   countNetLines
-  if [ $((shownLineCnt + netLineCnt)) -lt $beginLineNum ]; then
+  if ((shownLineCnt + netLineCnt < beginLineNum)); then
     shownCompleteLines+="${line}"$'\n'
     printf '%s\n' "$line"
     line=''
@@ -182,7 +182,7 @@ done
 # Incomplete line without newline.
 if [ -n "$line" ]; then
   countNetLines
-  if [ $((shownLineCnt + netLineCnt)) -lt $beginLineNum ]; then
+  if ((shownLineCnt + netLineCnt < beginLineNum)); then
     # Short enough to show completely.
     earlyIncompleteLine="$line"
     line=''
@@ -248,10 +248,10 @@ then
 
   while IFS=$'\n' read -r line; do
     countNetLines
-    if [ $((collectedLineCnt + netLineCnt)) -le $((endLineNum + 1)) ]; then
+    if ((collectedLineCnt + netLineCnt <= endLineNum + 1)); then
       collectedLinesWithoutTruncation="${collectedLines}${line}"$'\n'
     fi
-    if [ $((collectedLineCnt + netLineCnt)) -le $endLineNum ]; then
+    if ((collectedLineCnt + netLineCnt <= endLineNum)); then
       collectedLines+="${line}"$'\n'
       let collectedLineCnt+=netLineCnt
       let wrappedLineCnt+=netLineCnt-1
