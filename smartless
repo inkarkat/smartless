@@ -93,7 +93,7 @@ fi
 
 addeol()
 {
-  sed -e '$a\'
+  sed -e '$a'\\
 }
 
 reverseANSI()
