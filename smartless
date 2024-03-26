@@ -129,8 +129,7 @@ estimateLineCount()
   # expand tabs to 8 spaces and turn everything but non-printable ASCII
   # characters into two spaces (so, assume it's a double-width character).
   local lineWidth="${line//	/        }"
-  lineWidth="${lineWidth//[\{\}]/x}"  # Somehow cannot include these in the negative collection, so turn them into an ASCII character.
-  lineWidth="${lineWidth//[^ -z]/  }"
+  lineWidth="${lineWidth//[^ -~]/  }"
   lineWidth=${#lineWidth}
   printf %d $(((lineWidth - 1) / COLUMNS + 1))
 }
