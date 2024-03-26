@@ -297,7 +297,7 @@ then
     else
       # Too long; only collect what fits the terminal.
       availableLines=$((endLineNum - collectedLineCnt + 1))
-      countNetLines $availableLines; collectedLines+="$netLines"
+      countNetLines $availableLines; collectedLines+="$netLines"$'\n'
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
       break
