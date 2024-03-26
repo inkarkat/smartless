@@ -180,7 +180,7 @@ else
   {
     # Manually remove ANSI escape sequences.
     # The estimate errs on the larger side.
-    let netLineCnt=$(estimateLineCount "${line//[*([0-9:;?])[a-zA-Z]/}")
+    let netLineCnt=$(estimateLineCount "${line//\[*([0-9:;?])[a-zA-Z]/}")
 
     if [ $# -gt 0 ]; then
       netLines+="${line:0:$((($1 - 1) * COLUMNS))}"
