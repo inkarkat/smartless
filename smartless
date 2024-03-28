@@ -290,12 +290,12 @@ then
   while IFS=$'\n' read -r line; do
     collectedLinesWithoutTruncation=''
     countNetLines
-    ####D echo >&2 "**** I already had $collectedLineCnt, now $netLineCnt and available $endLineNum"
+    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: I already had $collectedLineCnt, now $netLineCnt and available $endLineNum";; esac
     if ((collectedLineCnt + netLineCnt == endLineNum + 1)); then
-      ####D echo >&2 "**** have $netLineCnt, only $availableLines available, but would fit without truncation"
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation";; esac
       collectedLinesWithoutTruncation="${collectedLines}${line}"
     elif ((collectedLineCnt + netLineCnt <= endLineNum)); then
-      ####D echo >&2 "**** taking in full"
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: **** taking in full";; esac
       collectedLines+="${line}"$'\n'
       let collectedLineCnt+=netLineCnt
       let wrappedLineCnt+=netLineCnt-1
@@ -305,7 +305,7 @@ then
       countNetLines $availableLines; collectedLines+="$netLines"$'\n'
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
-      ####D echo >&2 "**** is too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}"
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: **** is too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
       break
     fi
   done < <(
@@ -321,14 +321,10 @@ then
     # trailing lines makes up the entire file. If that's the case, there's been
     # wrapping, but no truncation.
     tmpCollectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
-    ####D printf %s "$tmpCollectedLines" > ~/tmp/smartless/tmpCollectedLinesOrig
-    ####D printf %s "$tmpCollectedLines" | reverse > ~/tmp/smartless/tmpCollectedLines
-    ####D printf %s "$alreadyShownContent" > ~/tmp/smartless/alreadyShownContent
-    ####D cp "$captureFilespec" ~/tmp/smartless/captureFilespec
     tmpCollectedBytes=$(printf %s "$tmpCollectedLines" | wc --bytes)
     totalBytes="$(wc --bytes -- "$captureFilespec")"; totalBytes=${totalBytes%% *}
     ((byteOffset + tmpCollectedBytes == totalBytes)) && isTruncated=
-    ####D echo >&2 "**** $byteOffset , $tmpCollectedBytes = $((byteOffset + tmpCollectedBytes)) and $totalBytes${isTruncated:+, truncated}"
+    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: $byteOffset , $tmpCollectedBytes = $((byteOffset + tmpCollectedBytes)) and $totalBytes${isTruncated:+, truncated}";; esac
   fi
 
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
@@ -337,6 +333,15 @@ then
     collectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
   fi
   printf %s "$collectedLines" | reverse # Undo the reversal of both lines and characters.
+
+  case ",${DEBUG:-}," in
+    *,smartless:files,*)
+      printf %s "$collectedLines" > ~/tmp/smartless/collectedLinesOrig
+      printf %s "$collectedLines" | reverse > ~/tmp/smartless/collectedLines
+      printf %s "$alreadyShownContent" > ~/tmp/smartless/alreadyShownContent
+      cp "$captureFilespec" ~/tmp/smartless/captureFilespec
+      ;;
+  esac
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
 fi
