@@ -96,7 +96,7 @@ addeol()
   sed -e '$a'\\
 }
 
-reverseANSI()
+reverseAnsi()
 {
 sed -e '
 tb
@@ -119,7 +119,7 @@ tb  # Rinse and repeat.
 }
 reverse()
 {
-  reverseANSI | rev | tac
+  reverseAnsi | rev | tac
 }
 
 estimateLineCount()
