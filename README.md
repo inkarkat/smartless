@@ -1,6 +1,6 @@
 # smartless
 
-`smartless` is a pager that behaves just like `less`, but will show the file (or output) directly to the terminal if it is short enough to fit in the terminal height.  For longer files, the pager is still invoked.
+`smartless` is a pager that behaves just like `less`, but will show the file (or output) directly to the terminal if it is short enough to fit in the terminal height.  For longer files, the pager is still invoked, and only the leading and trailing lines will be kept in the terminal, with a truncation message in the middle.
 
 Here is a small demo, and I have also written a [blog post](http://stefanheule.com/blog/posts/2015-06-07/smartless-a-better-pager-for-small-and-large-inputs/) about this project.
 
@@ -8,7 +8,7 @@ Here is a small demo, and I have also written a [blog post](http://stefanheule.c
 
 ## Prerequisites
 
-`smartless` requires a reasonable recent version of `bash`, and a pager like `less`.  Both are available by default on most Unix systems.
+`smartless` requires `bash`, `sed`, and a pager like `less`.  All are available by default on most Unix systems.
 
 To consider wrapping of lines that are longer than the terminal width the [`nowrap` command](https://github.com/goodell/nowrap) is needed. Without it, full physical lines will be counted, and this can lead to scrolling of output in the terminal.
 
@@ -85,7 +85,7 @@ SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'
 
 ## Contributing
 
-Pull-requests to improve `smartless` are welcome.
+Pull requests to improve `smartless` are welcome.
 
 ## Credits
 
@@ -96,7 +96,7 @@ This is an independently maintained fork of the original version by Stefan Heule
 ## License
 
 > Copyright (c) 2015, Stefan Heule
-> Copyright (c) 2017-2022 Ingo Karkat
+> Copyright (c) 2017-2024 Ingo Karkat
 
 > Licensed under the **Apache License, Version 2.0** (the "License");
 you may not use this file except in compliance with the License.
