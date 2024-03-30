@@ -316,6 +316,19 @@ handleTail()
   esac
 }
 
+truncateFile()
+{
+  handleHead < "$captureFilespec"
+
+  if [ -n "$SMARTLESS_CAPTURE_DIR" ] && [ "$(dirname -- "$captureFilespec")" = "$SMARTLESS_CAPTURE_DIR" ]; then
+    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  else
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
+  fi
+
+  handleTail
+}
+
 readonly SCRIPT_PID=$$
 hasNonFiles=
 typeset -a lessArgs=()
@@ -327,8 +340,9 @@ do
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
     -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
     --)                   shift; break;;
-    --get-filespec)       getCaptureFilespec; exit;;
-    --do-housekeeping)    doCaptureHousekeeping; exit;;
+    --get-filespec)       shift; getCaptureFilespec; exit;;
+    --do-housekeeping)    shift; doCaptureHousekeeping; exit;;
+    --truncate-only)      shift; captureFilespec="${1:?}"; shift; truncateFile; exit;;
     --quit-if-one-screen|-F)
                           printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
                           shift
