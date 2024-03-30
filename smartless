@@ -264,6 +264,23 @@ handleHead()
   fi
 }
 
+captureHead()
+{
+  if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
+    captureFilespec="$(getCaptureFilespec)"
+
+    # Run housekeeping jobs in the background, to avoid blocking the output.
+    ( doCaptureHousekeeping ) &
+
+    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  else
+    captureFilespec="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+    trap 'rm -f -- "$captureFilespec" 2>/dev/null' EXIT
+    printf -v truncationMessage '%s... (full output truncated) ...%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
+  fi
+  printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
+}
+
 feedPager()
 {
   printf '%s%s' "$shownCompleteLines" "$line"
@@ -347,20 +364,7 @@ handleHead
 if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
   || { IFS=$'\n' read -r line && line+=$'\n'; }
 then
-  if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
-    captureFilespec="$(getCaptureFilespec)"
-
-    # Run housekeeping jobs in the background, to avoid blocking the output.
-    ( doCaptureHousekeeping ) &
-
-    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
-  else
-    captureFilespec="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
-    trap 'rm -f -- "$captureFilespec" 2>/dev/null' EXIT
-    printf -v truncationMessage '%s... (full output truncated) ...%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
-  fi
-  printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
-
+  captureHead
   eval 'feedPager' \
     "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
     | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
