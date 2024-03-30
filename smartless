@@ -48,6 +48,11 @@ fi
 # arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
+getCaptureFilespec()
+{
+  mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM"
+}
+
 readonly SCRIPT_PID=$$
 hasNonFiles=
 typeset -a lessArgs=()
@@ -59,6 +64,7 @@ do
     -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
     -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
     --)                   shift; break;;
+    --get-filespec)       getCaptureFilespec; exit;;
     --quit-if-one-screen|-F)
                           printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
                           shift
@@ -247,7 +253,7 @@ if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
   || { IFS=$'\n' read -r line && line+=$'\n'; }
 then
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
-    captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
+    captureFilespec="$(getCaptureFilespec)"
 
     # Run housekeeping jobs in the background, to avoid blocking the output.
     (
