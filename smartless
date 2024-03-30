@@ -53,6 +53,19 @@ getCaptureFilespec()
   mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM"
 }
 
+doCaptureHousekeeping()
+{
+  if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
+    # Clean up old captures.
+    find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
+  fi
+  if type -t rdfind >/dev/null; then
+    # Save disk space by de-duplicating previous (the current one may still be
+    # streamed in) captures via hard links.
+    rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
+  fi
+}
+
 readonly SCRIPT_PID=$$
 hasNonFiles=
 typeset -a lessArgs=()
@@ -65,6 +78,7 @@ do
     -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
     --)                   shift; break;;
     --get-filespec)       getCaptureFilespec; exit;;
+    --do-housekeeping)    doCaptureHousekeeping; exit;;
     --quit-if-one-screen|-F)
                           printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
                           shift
@@ -256,17 +270,7 @@ then
     captureFilespec="$(getCaptureFilespec)"
 
     # Run housekeeping jobs in the background, to avoid blocking the output.
-    (
-      if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
-        # Clean up old captures.
-        find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
-      fi
-      if type -t rdfind >/dev/null; then
-        # Save disk space by de-duplicating previous (the current one may still be
-        # streamed in) captures via hard links.
-        rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
-      fi
-    ) &
+    ( doCaptureHousekeeping ) &
 
     printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
   else
