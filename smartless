@@ -34,6 +34,9 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
+readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
+readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
+readonly beginLineNum=$((availableLineNum - endLineNum))
 
 [ -n "$COLUMNS" ] || COLUMNS=$(tput cols)
 
@@ -66,50 +69,10 @@ doCaptureHousekeeping()
   fi
 }
 
-readonly SCRIPT_PID=$$
-hasNonFiles=
-typeset -a lessArgs=()
-typeset -a filespecs=()
-while [ $# -ne 0 ]
-do
-  case "$1" in
-    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
-    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
-    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
-    --)                   shift; break;;
-    --get-filespec)       getCaptureFilespec; exit;;
-    --do-housekeeping)    doCaptureHousekeeping; exit;;
-    --quit-if-one-screen|-F)
-                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
-                          shift
-                          ;;
-    --*)                  lessArgs+=("$1"); shift;;
-    [-+]*)                lessArgs+=("$1"); shift;;
-    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
-  esac
-done
-set -- "${filespecs[@]}" "$@"
-
 delegateToPager()
 {
   exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
 }
-
-if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
-  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
-    delegateToPager "$@"
-  else
-    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
-    exit $?
-  fi
-elif [ "$hasNonFiles" ]; then
-  if [ $# -gt 1 ]; then
-    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
-  elif [ "$1" != '-' ]; then
-    # stdin will be read automatically; other non-regular file needs to be opened.
-    exec < "$1" || exit $?
-  fi
-fi
 
 addeol()
 {
@@ -213,10 +176,6 @@ else
     fi
   }
 fi
-
-readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
-readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
-readonly beginLineNum=$((availableLineNum - endLineNum))
 
 shownCompleteLines=
 wrappedLineCnt=0
@@ -356,6 +315,46 @@ handleTail()
       ;;
   esac
 }
+
+readonly SCRIPT_PID=$$
+hasNonFiles=
+typeset -a lessArgs=()
+typeset -a filespecs=()
+while [ $# -ne 0 ]
+do
+  case "$1" in
+    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
+    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
+    --)                   shift; break;;
+    --get-filespec)       getCaptureFilespec; exit;;
+    --do-housekeeping)    doCaptureHousekeeping; exit;;
+    --quit-if-one-screen|-F)
+                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
+                          shift
+                          ;;
+    --*)                  lessArgs+=("$1"); shift;;
+    [-+]*)                lessArgs+=("$1"); shift;;
+    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
+  esac
+done
+set -- "${filespecs[@]}" "$@"
+
+if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
+  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
+    delegateToPager "$@"
+  else
+    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
+    exit $?
+  fi
+elif [ "$hasNonFiles" ]; then
+  if [ $# -gt 1 ]; then
+    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
+  elif [ "$1" != '-' ]; then
+    # stdin will be read automatically; other non-regular file needs to be opened.
+    exec < "$1" || exit $?
+  fi
+fi
 
 # Read and display enough lines to fill (almost) half of the terminal.
 handleHead
