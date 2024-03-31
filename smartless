@@ -25,9 +25,6 @@
 
 # ------------------------------------------------------------------------------
 
-# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
-[ -t 1 ] || exec cat
-
 # Number of lines to directly display before switching to less.
 if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     # Default to 5 lines less than the screen height.
@@ -353,6 +350,9 @@ do
   esac
 done
 set -- "${filespecs[@]}" "$@"
+
+# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
+[ -t 1 ] || exec cat
 
 if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
   if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
