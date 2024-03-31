@@ -25,15 +25,15 @@
 
 # ------------------------------------------------------------------------------
 
-# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
-[ -t 1 ] || exec cat
-
 # Number of lines to directly display before switching to less.
 if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     # Default to 5 lines less than the screen height.
     [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
+readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
+readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
+readonly beginLineNum=$((availableLineNum - endLineNum))
 
 [ -n "$COLUMNS" ] || COLUMNS=$(tput cols)
 
@@ -48,48 +48,28 @@ fi
 # arguments to "find" can be used here.
 : ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
 
-readonly SCRIPT_PID=$$
-hasNonFiles=
-typeset -a lessArgs=()
-typeset -a filespecs=()
-while [ $# -ne 0 ]
-do
-  case "$1" in
-    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
-    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
-    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
-    --)                   shift; break;;
-    --quit-if-one-screen|-F)
-                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
-                          shift
-                          ;;
-    --*)                  lessArgs+=("$1"); shift;;
-    [-+]*)                lessArgs+=("$1"); shift;;
-    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
-  esac
-done
-set -- "${filespecs[@]}" "$@"
+getCaptureFilespec()
+{
+  mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM"
+}
+
+doCaptureHousekeeping()
+{
+  if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
+    # Clean up old captures.
+    find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
+  fi
+  if type -t rdfind >/dev/null; then
+    # Save disk space by de-duplicating previous (the current one may still be
+    # streamed in) captures via hard links.
+    rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
+  fi
+}
 
 delegateToPager()
 {
   exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
 }
-
-if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
-  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
-    delegateToPager "$@"
-  else
-    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
-    exit $?
-  fi
-elif [ "$hasNonFiles" ]; then
-  if [ $# -gt 1 ]; then
-    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
-  elif [ "$1" != '-' ]; then
-    # stdin will be read automatically; other non-regular file needs to be opened.
-    exec < "$1" || exit $?
-  fi
-fi
 
 addeol()
 {
@@ -194,73 +174,59 @@ else
   }
 fi
 
-readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
-readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
-readonly beginLineNum=$((availableLineNum - endLineNum))
-
-# Read and display enough lines to fill (almost) half of the terminal.
-shownLineCnt=0
 shownCompleteLines=
 wrappedLineCnt=0
 isTruncated=
 lineRemainder=
-while IFS=$'\n' read -r line; do
-  countNetLines
-  if ((shownLineCnt + netLineCnt < beginLineNum)); then
-    shownCompleteLines+="${line}"$'\n'
-    printf '%s\n' "$line"
-    line=''
-    let shownLineCnt+=netLineCnt
-    let wrappedLineCnt+=netLineCnt-1
-  else
-    # Too long; only print what fits the terminal and show in full in pager.
-    availableLines=$((beginLineNum - shownLineCnt))
-    countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
-    let wrappedLineCnt+=availableLines-1
-    [ $availableLines -lt $netLineCnt ] && isTruncated=t
-    lineRemainder="$line"$'\n'
-    line=''
-    break
-  fi
-done
-# Incomplete line without newline.
-if [ -n "$line" ]; then
-  countNetLines
-  if ((shownLineCnt + netLineCnt < beginLineNum)); then
-    # Short enough to show completely.
-    earlyIncompleteLine="$line"
-    line=''
-  else
-    # Too long; only print what fits the terminal and show in full in pager.
-    availableLines=$((beginLineNum - shownLineCnt))
-    countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
-    let wrappedLineCnt+=availableLines-1
-    [ $availableLines -lt $netLineCnt ] && isTruncated=t
-    lineRemainder="$line"
-    line=''
-  fi
-fi
 
+handleHead()
+{
+  local shownLineCnt=0
+  while IFS=$'\n' read -r line; do
+    countNetLines
+    if ((shownLineCnt + netLineCnt < beginLineNum)); then
+      shownCompleteLines+="${line}"$'\n'
+      printf '%s\n' "$line"
+      line=''
+      let shownLineCnt+=netLineCnt
+      let wrappedLineCnt+=netLineCnt-1
+    else
+      # Too long; only print what fits the terminal and show in full in pager.
+      availableLines=$((beginLineNum - shownLineCnt))
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      lineRemainder="$line"$'\n'
+      line=''
+      break
+    fi
+  done
+  # Incomplete line without newline.
+  if [ -n "$line" ]; then
+    countNetLines
+    if ((shownLineCnt + netLineCnt < beginLineNum)); then
+      # Short enough to show completely.
+      earlyIncompleteLine="$line"
+      line=''
+    else
+      # Too long; only print what fits the terminal and show in full in pager.
+      availableLines=$((beginLineNum - shownLineCnt))
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      lineRemainder="$line"
+      line=''
+    fi
+  fi
+}
 
-# If the input is longer, run the pager.
-if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
-  || { IFS=$'\n' read -r line && line+=$'\n'; }
-then
+captureHead()
+{
   if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
-    captureFilespec=$(mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM")
+    captureFilespec="$(getCaptureFilespec)"
 
     # Run housekeeping jobs in the background, to avoid blocking the output.
-    (
-      if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
-        # Clean up old captures.
-        find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
-      fi
-      if type -t rdfind >/dev/null; then
-        # Save disk space by de-duplicating previous (the current one may still be
-        # streamed in) captures via hard links.
-        rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
-      fi
-    ) &
+    ( doCaptureHousekeeping ) &
 
     printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
   else
@@ -269,19 +235,16 @@ then
     printf -v truncationMessage '%s... (full output truncated) ...%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
   fi
   printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
+}
 
-  feedPager()
-  {
-    printf '%s%s' "$shownCompleteLines" "$line"
-    tee --append -- "$captureFilespec"
-  }
+feedPager()
+{
+  printf '%s%s' "$shownCompleteLines" "$line"
+  tee --append -- "$captureFilespec"
+}
 
-  eval 'feedPager' \
-    "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
-    | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
-
-
-  # Fill the second half of the terminal with trailing lines.
+handleTail()
+{
   # The handling of wrapped lines only works forward, so we need to reverse both
   # lines and characters. Therefore, these cannot be directly printed, but need
   # to be collected and reversed again. The algorithm is the same as at the
@@ -301,7 +264,7 @@ then
       case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation";; esac
       collectedLinesWithoutTruncation="${collectedLines}${line}"
     elif ((collectedLineCnt + netLineCnt <= endLineNum)); then
-      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: **** taking in full";; esac
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: taking in full";; esac
       collectedLines+="${line}"$'\n'
       let collectedLineCnt+=netLineCnt
       let wrappedLineCnt+=netLineCnt-1
@@ -311,7 +274,7 @@ then
       countNetLines $availableLines; collectedLines+="$netLines"$'\n'
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
-      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: **** is too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
       break
     fi
   done < <(
@@ -348,6 +311,80 @@ then
       cp "$captureFilespec" ~/tmp/smartless/captureFilespec
       ;;
   esac
+}
+
+truncateFile()
+{
+  handleHead < "$captureFilespec"
+
+  if [ -n "$SMARTLESS_CAPTURE_DIR" ] && [ "$(dirname -- "$captureFilespec")" = "$SMARTLESS_CAPTURE_DIR" ]; then
+    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  else
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
+  fi
+
+  handleTail
+}
+
+readonly SCRIPT_PID=$$
+hasNonFiles=
+typeset -a lessArgs=()
+typeset -a filespecs=()
+while [ $# -ne 0 ]
+do
+  case "$1" in
+    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
+    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
+    --)                   shift; break;;
+    --get-filespec)       shift; getCaptureFilespec; exit;;
+    --do-housekeeping)    shift; doCaptureHousekeeping; exit;;
+    --truncate-only)      shift; captureFilespec="${1:?}"; shift; truncateFile; exit;;
+    --quit-if-one-screen|-F)
+                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
+                          shift
+                          ;;
+    --*)                  lessArgs+=("$1"); shift;;
+    [-+]*)                lessArgs+=("$1"); shift;;
+    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
+  esac
+done
+set -- "${filespecs[@]}" "$@"
+
+# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
+[ -t 1 ] || exec cat
+
+if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
+  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
+    delegateToPager "$@"
+  else
+    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
+    exit $?
+  fi
+elif [ "$hasNonFiles" ]; then
+  if [ $# -gt 1 ]; then
+    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
+  elif [ "$1" != '-' ]; then
+    # stdin will be read automatically; other non-regular file needs to be opened.
+    exec < "$1" || exit $?
+  fi
+fi
+
+# Read and display enough lines to fill (almost) half of the terminal.
+handleHead
+
+# If the input is longer, run the pager.
+if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
+  || { IFS=$'\n' read -r line && line+=$'\n'; }
+then
+  captureHead
+  eval 'feedPager' \
+    "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
+    | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+
+
+  # Fill the second half of the terminal with trailing lines.
+  handleTail
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
 fi
