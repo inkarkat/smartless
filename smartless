@@ -193,7 +193,7 @@ handleHead()
     else
       # Too long; only print what fits the terminal and show in full in pager.
       availableLines=$((beginLineNum - shownLineCnt))
-      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
       lineRemainder="$line"$'\n'
@@ -211,7 +211,7 @@ handleHead()
     else
       # Too long; only print what fits the terminal and show in full in pager.
       availableLines=$((beginLineNum - shownLineCnt))
-      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s\n' "$netLines"
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
       lineRemainder="$line"
@@ -255,6 +255,7 @@ handleTail()
   # Don't repeat content already shown from the beginning.
   alreadyShownContent="${shownCompleteLines}${netLines}"
   byteOffset=$(printf %s "$alreadyShownContent" | wc --bytes)
+  alreadyShownNetlines="$netLines"
 
   while IFS=$'\n' read -r line; do
     collectedLinesWithoutTruncation=''
@@ -297,7 +298,7 @@ handleTail()
   fi
 
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
-    printf '%s\n' "$truncationMessage"
+    printf "${alreadyShownNetlines:+\n}%s\\n" "$truncationMessage"
   elif [ ! "$isTruncated" ]; then
     collectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
   fi
@@ -381,7 +382,6 @@ then
   eval 'feedPager' \
     "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
     | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
-
 
   # Fill the second half of the terminal with trailing lines.
   handleTail
