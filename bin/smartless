@@ -157,7 +157,7 @@ handleHead()
   local shownLineCnt=0
   while IFS=$'\n' read -r line; do
     countNetLines
-    if ((shownLineCnt + netLineCnt < beginLineNum)); then
+    if ((shownLineCnt + netLineCnt <= beginLineNum)); then
       case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: taking in full";; esac
       shownCompleteLines+="${line}"$'\n'
       printf '%s\n' "$line"
