@@ -158,6 +158,7 @@ handleHead()
   while IFS=$'\n' read -r line; do
     countNetLines
     if ((shownLineCnt + netLineCnt < beginLineNum)); then
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: taking in full";; esac
       shownCompleteLines+="${line}"$'\n'
       printf '%s\n' "$line"
       line=''
@@ -166,6 +167,7 @@ handleHead()
     else
       # Too long; only print what fits the terminal and show in full in pager.
       availableLines=$((beginLineNum - shownLineCnt))
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: I already had $shownLineCnt, now $netLineCnt and available $availableLines";; esac
       countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
@@ -179,11 +181,13 @@ handleHead()
     countNetLines
     if ((shownLineCnt + netLineCnt < beginLineNum)); then
       # Short enough to show completely.
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: taking incomplete in full";; esac
       earlyIncompleteLine="$line"
       line=''
     else
       # Too long; only print what fits the terminal and show in full in pager.
       availableLines=$((beginLineNum - shownLineCnt))
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: I already had $shownLineCnt, now incomplete $netLineCnt and available $availableLines";; esac
       countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
