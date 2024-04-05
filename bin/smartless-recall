@@ -1,12 +1,11 @@
 #!/bin/bash
-
 shopt -qs extglob
 
 printUsage()
 {
     cat <<HELPTEXT
-Recall previous N'th smartless output, or the one where the capture file name
-is NAME / contains *NAME-GLOB*, or the latest one where the captured contents match
+Recall previous N'th smartless output, or the one where the capture file name is
+NAME / contains *NAME-GLOB*, or the latest one where the captured contents match
 (grep-style) PATTERN / GREP-ARGS.
 HELPTEXT
     echo
