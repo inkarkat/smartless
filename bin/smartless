@@ -39,6 +39,7 @@ readonly beginLineNum=$((availableLineNum - endLineNum))
 
 : ${SMARTLESS_PAGER:=less} # pager to be used
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
+: ${SMARTLESS_RECALL_COMMAND=smartless-recall}  # hinted command name to recall full output
 
 # Highlighting of messages.
 : ${SMARTLESS_COLOR=$'\e[0;38;5;2m'}
@@ -199,13 +200,13 @@ handleHead()
 
 captureHead()
 {
-  if [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
+  if [ -n "$SMARTLESS_RECALL_COMMAND" ] && [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
     captureFilespec="$(getCaptureFilespec)"
 
     # Run housekeeping jobs in the background, to avoid blocking the output.
     ( doCaptureHousekeeping ) &
 
-    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_RECALL_COMMAND" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
   else
     captureFilespec="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
     trap 'rm -f -- "$captureFilespec" 2>/dev/null' EXIT
@@ -295,8 +296,8 @@ truncateFile()
 {
   handleHead < "$captureFilespec"
 
-  if [ -n "$SMARTLESS_CAPTURE_DIR" ] && [ "$(dirname -- "$captureFilespec")" = "$SMARTLESS_CAPTURE_DIR" ]; then
-    printf -v truncationMessage '%s... recall full output via $ mr %q%s' "$SMARTLESS_COLOR" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  if [ -n "$SMARTLESS_RECALL_COMMAND" ] && [ -n "$SMARTLESS_CAPTURE_DIR" ] && [ "$(dirname -- "$captureFilespec")" = "$SMARTLESS_CAPTURE_DIR" ]; then
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_RECALL_COMMAND" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
   else
     printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
   fi

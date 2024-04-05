@@ -70,6 +70,9 @@ SMARTLESS_PAGER='less'
 # the default arguments to the pager
 SMARTLESS_PAGER_ARGUMENTS='-iR'
 
+# hinted command name to recall full output; this can be overridden if you define a shorter alias and want to use that in the truncation message
+SMARTLESS_RECALL_COMMAND=smartless-recall
+
 # highlighting of messages
 SMARTLESS_COLOR=$'\e[38;5;2m'
 SMARTLESS_COLOR_OFF=$'\e[0m'
