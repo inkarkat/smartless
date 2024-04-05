@@ -1,15 +1,52 @@
 #!/bin/bash
+set -o pipefail
 shopt -qs extglob
 
+: ${SMARTLESSRECALL_COMMAND_JOINER=;}
+: ${SMARTLESSRECALL_EXEC_END=;}
+: ${SMARTLESSRECALL_GREP_END=;}
+: ${SMARTLESSRECALL_FILE_MARKER='{}'}
+fileMarker="$SMARTLESSRECALL_FILE_MARKER"; unset SMARTLESSRECALL_FILE_MARKER
+
+printShortUsage()
+{
+    # Note: short followed by long option; if the user knows the short one, she can
+    # skim the long one.
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|--grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...] [-?|-h|--help]"
+}
 printUsage()
 {
-    cat <<HELPTEXT
+    # This is the short help when launched with no or incorrect arguments.
+    # It is printed to stderr to avoid accidental processing.
+    printShortUsage "$1" >&2
+    printf >&2 '\nTry %q --help for more information.\n' "$(basename "$1")"
+}
+printLongUsage()
+{
+    # This is the long "man page" when launched with the help argument.
+    # It is printed to stdout to allow paging with 'more'.
+    cat <<HELPDESCRIPTION
 Recall previous N'th smartless output, or the one where the capture file name is
 NAME / contains *NAME-GLOB*, or the latest one where the captured contents match
 (grep-style) PATTERN / GREP-ARGS.
-HELPTEXT
+The output is shown in the pager, or its filespec is ${fileMarker:+either }appended to${fileMarker:+ or
+replaces any $fileMarker marker inside} COMMANDLINE (and possibly passed COMMAND-ARGS).
+HELPDESCRIPTION
     echo
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[N|NAME|NAME-GLOB|PATTERN|GREP-ARGS ...] [-?|-h|--help]"
+    printShortUsage "$1"
+    echo
+    cat <<HELPTEXT
+    --grep GREP-ARGS [...] ${SMARTLESSRECALL_GREP_END}
+			Recall the newest capture file that matches GREP-ARGS;
+			all following arguments are taken to be grep arguments
+			until an argument consisting of '${SMARTLESSRECALL_GREP_END}' is encountered.
+    --command|-c CMD	Execute CMD as a command-line.${fileMarker:+ The string $fileMarker is
+			replaced by the recalled output file.}
+    --exec CMD [...] ${SMARTLESSRECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
+			arguments to the CMD until an argument consisting of
+			'${SMARTLESSRECALL_EXEC_END}' is encountered.${fileMarker:+ The string $fileMarker is replaced by the
+			recalled output file.}
+HELPTEXT
 }
 
 ensureCaptureDir()
@@ -25,7 +62,6 @@ ensureCaptureDir()
 
 getCaptures()
 {
-    ensureCaptureDir || exit $?
     readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
     if [ ${#captures[@]} -eq 0 ]; then
 	printf >&2 'ERROR: No captured outputs in %s\n' "$SMARTLESS_CAPTURE_DIR"
@@ -45,27 +81,100 @@ recallGrep()
     grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | head -n 1
 }
 
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-    '')			filespec="$(recallByNumber 1)";;
-    +([0-9]))		filespec="$(recallByNumber "$1")";;
-    *)			ensureCaptureDir || exit $?
-			if [ $# -eq 1 ] && filespec="${SMARTLESS_CAPTURE_DIR}/$1" && [ -r "$filespec" ]; then
-			    : # Directly take the NAME.
-			elif [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
-			    filespec="${filespecs[0]}"
-			else
-			    filespec="$(recallGrep "$@")"
-			fi
+commands=
+typeset -a commandArgs=()
+haveMatcher=
+while [ $# -ne 0 ]
+do
+    case "$1" in
+	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--command|-c)	shift; commands+="${commands:+ $SMARTLESSRECALL_COMMAND_JOINER }$1"; shift;;
+	--exec)		shift
+			cmd=
+			printf -v escapedFileMarker %q "$fileMarker"
+			while [ $# -gt 0 -a "$1" != "$SMARTLESSRECALL_EXEC_END" ]
+			do
+			    printf -v quotedArg '%q' "$1"
+			    cmd+="${cmd:+ }${quotedArg//"$escapedFileMarker"/$fileMarker}"	# %q escapes {}, we don't want that to have it interpolated later.
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --exec command must be concluded with '${SMARTLESSRECALL_EXEC_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			commands+="${commands:+ $SMARTLESSRECALL_COMMAND_JOINER }${cmd}"
 			;;
-esac
+	--grep)		shift
+			typeset -a grepArgs=()
+			while [ $# -gt 0 -a "$1" != "$SMARTLESSRECALL_GREP_END" ]
+			do
+			    grepArgs+=("$1")
+			    shift
+			done
+			if [ $# -eq 0 ]; then
+			    echo "ERROR: --grep must be concluded with '${SMARTLESSRECALL_GREP_END}'"; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			shift
+			if [ ${#grepArgs[@]} -eq 0 ]; then
+			    echo 'ERROR: --grep must be followed by at least one GREP-ARG.'; echo; printUsage "$0"
+			    exit 2
+			fi >&2
+			haveMatcher=t
+			filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
+			;;
+	*)		if [ "$haveMatcher" ]; then
+			    commandArgs+=("$1")
+			else
+			    ensureCaptureDir || exit $?
+			    if [ -z "$1" ]; then
+				# Empty argument means first capture, matcher done, following arguments are COMMAND-ARGS.
+				filespec="$(recallByNumber 1)"
+			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
+				# Number means N'th recent capture.
+				filespec="$(recallByNumber "$1")"
+			    elif potentialFilespec="${SMARTLESS_CAPTURE_DIR}/${1}" && [ -r "$potentialFilespec" ]; then
+				# Take the full given NAME.
+				filespec="$potentialFilespec"
+			    elif readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) \
+				&& [ ${#filespecs[@]} -eq 1 ]
+			    then
+				# Take a unique partial NAME.
+				filespec="${filespecs[0]}"
+			    else
+				# Take the newest matching file.
+				filespec="$(recallGrep "$1")"
+			    fi
+			fi
+			shift
+			haveMatcher=t
+			;;
+    esac
+done
+if [ -z "$filespec" ] && [ ! "$haveMatcher" ]; then
+    filespec="$(recallByNumber 1)"
+fi
 if [ -z "$filespec" ]; then
     echo >&2 'ERROR: No such captured output.'
     exit 1
 fi
 
-# Do not use $PAGER (i.e. smartless) here; this would create another duplicate
-# capture that messes up the N addressing (and is a bit wasteful). As only long
-# output is captured, anyway, we can definitely use the real pager that
-# smartless uses as well.
-exec "${SMARTLESS_PAGER:-less}" ${SMARTLESS_PAGER_ARGUMENTS:-} "$filespec"
+if [ -z "$commands" ]; then
+    # Do not use $PAGER (i.e. smartless) here; this would create another duplicate
+    # capture that messes up the N addressing (and is a bit wasteful). As only long
+    # output is captured, anyway, we can definitely use the real pager that
+    # smartless uses as well.
+    printf -v commands '%q %s' "${SMARTLESS_PAGER:-less}" "$SMARTLESS_PAGER_ARGUMENTS"
+fi
+if [ ${#commandArgs[@]} -gt 0 ]; then
+    printf -v quotedCommandArgs ' %q' "${commandArgs[@]}"
+    commands+="$quotedCommandArgs"
+fi
+
+interpolatedCommands="${commands//"$fileMarker"/$filespec}"
+typeset -a f=("$filespec")
+printf -v filespec '%q' "$filespec"
+interpolatedCommands="${commands//"$fileMarker"/$filespec}"
+[ "$interpolatedCommands" = "$commands" ] || f=()
+eval "$interpolatedCommands" '"${f[@]}"'
