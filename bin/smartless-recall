@@ -11,20 +11,21 @@ HELPTEXT
     echo
     printf 'Usage: %q %s\n' "$(basename "$1")" "[N|NAME|NAME-GLOB|PATTERN|GREP-ARGS ...] [-?|-h|--help]"
 }
-case "$1" in
-    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
-esac
 
-if [ ! "$SMARTLESS_CAPTURE_DIR" ]; then
-    echo >&2 "ERROR: \$SMARTLESS_CAPTURE_DIR is not defined."
-    exit 2
-elif [ ! -d "$SMARTLESS_CAPTURE_DIR" ]; then
-    echo >&2 "ERROR: The \$SMARTLESS_CAPTURE_DIR ($SMARTLESS_CAPTURE_DIR) does not exist."
-    exit 2
-fi
+ensureCaptureDir()
+{
+    if [ ! "$SMARTLESS_CAPTURE_DIR" ]; then
+	echo >&2 "ERROR: \$SMARTLESS_CAPTURE_DIR is not defined."
+	return 2
+    elif [ ! -d "$SMARTLESS_CAPTURE_DIR" ]; then
+	echo >&2 "ERROR: The \$SMARTLESS_CAPTURE_DIR ($SMARTLESS_CAPTURE_DIR) does not exist."
+	return 2
+    fi
+}
 
 getCaptures()
 {
+    ensureCaptureDir || exit $?
     readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
     if [ ${#captures[@]} -eq 0 ]; then
 	printf >&2 'ERROR: No captured outputs in %s\n' "$SMARTLESS_CAPTURE_DIR"
@@ -45,18 +46,19 @@ recallGrep()
 }
 
 case "$1" in
-    '')		filespec="$(recallByNumber 1)";;
-    +([0-9]))	filespec="$(recallByNumber "$1")";;
-    *)		if [ $# -eq 1 ] && filespec="${SMARTLESS_CAPTURE_DIR}/$1" && [ -r "$filespec" ]; then
-		    : # Directly take the NAME.
-		elif [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
-		    filespec="${filespecs[0]}"
-		else
-		    filespec="$(recallGrep "$@")"
-		fi
-		;;
+    --help|-h|-\?)	shift; printUsage "$0"; exit 0;;
+    '')			filespec="$(recallByNumber 1)";;
+    +([0-9]))		filespec="$(recallByNumber "$1")";;
+    *)			ensureCaptureDir || exit $?
+			if [ $# -eq 1 ] && filespec="${SMARTLESS_CAPTURE_DIR}/$1" && [ -r "$filespec" ]; then
+			    : # Directly take the NAME.
+			elif [ $# -eq 1 ] && readarray -t filespecs < <(globmatch --files-matching "*${1}*" "$SMARTLESS_CAPTURE_DIR"/*) && [ ${#filespecs[@]} -eq 1 ]; then
+			    filespec="${filespecs[0]}"
+			else
+			    filespec="$(recallGrep "$@")"
+			fi
+			;;
 esac
-
 if [ -z "$filespec" ]; then
     echo >&2 'ERROR: No such captured output.'
     exit 1
