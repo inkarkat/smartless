@@ -12,7 +12,7 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|PATTERN|--grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|[N] PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...] [-?|-h|--help]"
 }
 printUsage()
 {
@@ -78,11 +78,12 @@ recallByNumber()
 recallGrep()
 {
     getCaptures	# Note: Cannot simply use $SMARTLESS_CAPTURE_DIR/* glob here because we want to return a match in the newest capture.
-    grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | head -n 1
+    grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
 }
 
 commands=
 typeset -a commandArgs=()
+count=
 haveMatcher=
 while [ $# -ne 0 ]
 do
@@ -126,14 +127,19 @@ do
 			;;
 	*)		if [ "$haveMatcher" ]; then
 			    commandArgs+=("$1")
+			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+			    ensureCaptureDir || exit $?
+			    # Number means N'th recent capture, but could also index into multiple results.
+			    count="$1"
+			    filespec="$(recallByNumber "$1")"
 			else
 			    ensureCaptureDir || exit $?
 			    if [ -z "$1" ]; then
 				# Empty argument means first capture, matcher done, following arguments are COMMAND-ARGS.
 				filespec="$(recallByNumber 1)"
 			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
-				# Number means N'th recent capture.
-				filespec="$(recallByNumber "$1")"
+				printUsage >&2 "$0"
+				exit 2
 			    elif potentialFilespec="${SMARTLESS_CAPTURE_DIR}/${1}" && [ -r "$potentialFilespec" ]; then
 				# Take the full given NAME.
 				filespec="$potentialFilespec"
@@ -143,16 +149,16 @@ do
 				# Take a unique partial NAME.
 				filespec="${filespecs[0]}"
 			    else
-				# Take the newest matching file.
+				# Take the newest / N'th matching file.
 				filespec="$(recallGrep "$1")"
 			    fi
+			    haveMatcher=t
 			fi
 			shift
-			haveMatcher=t
 			;;
     esac
 done
-if [ -z "$filespec" ] && [ ! "$haveMatcher" ]; then
+if [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
     filespec="$(recallByNumber 1)"
 fi
 if [ -z "$filespec" ]; then
