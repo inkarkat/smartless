@@ -272,7 +272,7 @@ handleTail()
     tmpCollectedBytes=$(printf %s "$tmpCollectedLines" | wc --bytes)
     totalBytes="$(wc --bytes -- "$captureFilespec")"; totalBytes=${totalBytes%% *}
     ((byteOffset + tmpCollectedBytes == totalBytes)) && isTruncated=
-    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: $byteOffset , $tmpCollectedBytes = $((byteOffset + tmpCollectedBytes)) and $totalBytes${isTruncated:+, truncated}";; esac
+    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: $byteOffset + $tmpCollectedBytes = $((byteOffset + tmpCollectedBytes)) and $totalBytes${isTruncated:+, truncated}";; esac
   fi
 
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
