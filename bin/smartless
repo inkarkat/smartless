@@ -241,7 +241,7 @@ handleTail()
     case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: I already had $collectedLineCnt, now $netLineCnt and available $endLineNum";; esac
     if ((collectedLineCnt + netLineCnt == endLineNum + 1)); then
       case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation";; esac
-      collectedLinesWithoutTruncation="${collectedLines}${line}"
+      collectedLinesWithoutTruncation="${collectedLines}${line}"$'\n'
     elif ((collectedLineCnt + netLineCnt <= endLineNum)); then
       case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: taking in full";; esac
       collectedLines+="${line}"$'\n'
