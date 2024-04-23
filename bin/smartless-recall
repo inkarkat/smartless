@@ -13,7 +13,7 @@ printShortUsage()
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
     printf 'Usage: %q %s\n' "$(basename "$1")" "[\"\"|N|NAME|NAME-GLOB|[N] PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [-?|-h|--help]"
-    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[--recapture] -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...]"
 }
 printUsage()
 {
@@ -41,6 +41,10 @@ HELPDESCRIPTION
 			Recall the newest capture file that matches GREP-ARGS;
 			all following arguments are taken to be grep arguments
 			until an argument consisting of '${SMARTLESSRECALL_GREP_END}' is encountered.
+    --recapture		If COMMAND(s) invoke smartless themselves (on the
+			recalled output), do capture that as well. By default,
+			captures are turned off to allow repeated recalls of the
+			same output.
     --command|-c CMD	Execute CMD as a command-line.${fileMarker:+ The string $fileMarker is
 			replaced by the recalled output file.}
     --exec CMD [...] ${SMARTLESSRECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
@@ -82,6 +86,7 @@ recallGrep()
     grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
 }
 
+isRecapture=
 commands=
 typeset -a commandArgs=()
 count=
@@ -90,6 +95,7 @@ while [ $# -ne 0 ]
 do
     case "$1" in
 	--help|-h|-\?)	shift; printLongUsage "$0"; exit 0;;
+	--recapture)	shift; isRecapture=t;;
 	--command|-c)	shift; commands+="${commands:+ $SMARTLESSRECALL_COMMAND_JOINER }$1"; shift;;
 	--exec)		shift
 			cmd=
@@ -181,6 +187,14 @@ fi
 if [ ${#commandArgs[@]} -gt 0 ]; then
     printf -v quotedCommandArgs ' %q' "${commandArgs[@]}"
     commands+="$quotedCommandArgs"
+fi
+
+if [ ! "$isRecapture" ]; then
+    # COMMAND(s) may still invoke smartless (directly or via $PAGER) themselves;
+    # don't create a new capture by default, as that would mess with repeating
+    # recalls. The contents that are transformed by COMMAND(s) are likely
+    # derivatives of the original capture, anyway.
+    export SMARTLESS_CAPTURE_DIR=''
 fi
 
 interpolatedCommands="${commands//"$fileMarker"/$filespec}"
