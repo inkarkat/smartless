@@ -285,6 +285,7 @@ handleTail()
   case ",${DEBUG:-}," in
     *,smartless:files,*)
       printf %s "$collectedLines" > ~/tmp/smartless/collectedLinesOrig
+      printf %s "$collectedLinesWithoutTruncation" | reverse > ~/tmp/smartless/collectedLinesWithoutTruncation
       printf %s "$collectedLines" | reverse > ~/tmp/smartless/collectedLines
       printf %s "$alreadyShownContent" > ~/tmp/smartless/alreadyShownContent
       cp "$captureFilespec" ~/tmp/smartless/captureFilespec
