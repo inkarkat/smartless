@@ -12,7 +12,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...]] [\"\"|N|NAME|NAME-GLOB|[N] PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[\"\"|N|NAME|NAME-GLOB|[N] PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "-c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...]"
 }
 printUsage()
 {
@@ -148,6 +149,10 @@ do
 			    then
 				# Take a unique partial NAME.
 				filespec="${filespecs[0]}"
+			    elif [ -n "$count" -a -n "$commands" ]; then
+				# With a COMMAND, "N PATTERN" is not supported and instead interpreted as
+				# "N COMMAND-ARG"; you need to use "N --grep PATTERN ;" instead.
+				commandArgs+=("$1")
 			    else
 				# Take the newest / N'th matching file.
 				filespec="$(recallGrep "$1")"
