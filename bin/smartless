@@ -40,6 +40,7 @@ readonly beginLineNum=$((availableLineNum - endLineNum))
 : ${SMARTLESS_PAGER:=less} # pager to be used
 : ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
 : ${SMARTLESS_RECALL_COMMAND=smartless-recall}  # hinted command name to recall full output
+: ${SMARTLESS_DIR_LISTER:=ls -l --} # command to show directory arguments (which are appended)
 
 # Highlighting of messages.
 : ${SMARTLESS_COLOR=$'\e[0;38;5;2m'}
@@ -310,6 +311,7 @@ readonly SCRIPT_PID=$$
 hasNonFiles=
 typeset -a lessArgs=()
 typeset -a filespecs=()
+typeset -a tempFilespecs=()
 while [ $# -ne 0 ]
 do
   case "$1" in
@@ -326,7 +328,26 @@ do
                           ;;
     --*)                  lessArgs+=("$1"); shift;;
     [-+]*)                lessArgs+=("$1"); shift;;
-    *)                    [ -f "$1" ] || hasNonFiles=t; filespecs+=("$1"); shift;;
+    *)                    fileArg="$1"; shift
+                          if [ -f "$fileArg" ]; then
+                            :
+                          elif [ -d "$fileArg" ]; then
+                            # Add a header with the dirspec (like ls -l does) if there are more than one
+                            # FILE arguments.
+                            isDirListerHeader=; [ ${#filespecs[@]} -eq 0 -a $# -eq 0 ] || isDirListerHeader=t
+
+                            prefix='smartless'; type -t pathAsFilename >/dev/null && prefix="$(pathAsFilename --encode -- "$fileArg")"
+                            tempFile="$(mktemp --tmpdir "${prefix}-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/${prefix}.$$$RANDOM")"
+
+                            { eval "${isDirListerHeader:+printf %s:\\\\n \"\$fileArg\"; }$SMARTLESS_DIR_LISTER \"\$fileArg\""; } > "$tempFile" 2>&1
+                            tempFilespecs+=("$tempFile")
+                            fileArg="$tempFile"
+                            [ "${DEBUG:-}" ] || trap 'rm -f -- "${tempFilespecs[@]}" 2>/dev/null' EXIT
+                          else
+                            hasNonFiles=t
+                          fi
+                          filespecs+=("$fileArg")
+                          ;;
   esac
 done
 set -- "${filespecs[@]}" "$@"
