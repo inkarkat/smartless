@@ -332,9 +332,14 @@ do
                           if [ -f "$fileArg" ]; then
                             :
                           elif [ -d "$fileArg" ]; then
+                            # Add a header with the dirspec (like ls -l does) if there are more than one
+                            # FILE arguments.
+                            isDirListerHeader=; [ ${#filespecs[@]} -eq 0 -a $# -eq 0 ] || isDirListerHeader=t
+
                             prefix='smartless'; type -t pathAsFilename >/dev/null && prefix="$(pathAsFilename --encode -- "$fileArg")"
                             tempFile="$(mktemp --tmpdir "${prefix}-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/${prefix}.$$$RANDOM")"
-                            eval "$SMARTLESS_DIR_LISTER \"\$fileArg\"" > "$tempFile" 2>&1
+
+                            { eval "${isDirListerHeader:+printf %s:\\\\n \"\$fileArg\"; }$SMARTLESS_DIR_LISTER \"\$fileArg\""; } > "$tempFile" 2>&1
                             tempFilespecs+=("$tempFile")
                             fileArg="$tempFile"
                             [ "${DEBUG:-}" ] || trap 'rm -f -- "${tempFilespecs[@]}" 2>/dev/null' EXIT
