@@ -367,7 +367,11 @@ elif [ "$hasNonFiles" ]; then
     delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
   elif [ "$1" != '-' ]; then
     # stdin will be read automatically; other non-regular file needs to be opened.
-    exec < "$1" || exit $?
+    { exec < "$1"; } 2>/dev/null || {
+      status=$?
+      printf >&2 'smartless: %s: No such file or directory\n' "$1"
+      exit $status
+    }
   fi
 fi
 
