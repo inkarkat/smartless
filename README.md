@@ -10,9 +10,10 @@ The original author (Stefan Heule) wrote a [blog post](http://stefanheule.com/bl
 
 ## Dependencies
 
-`smartless` requires `bash`, `sed`, and a pager like `less`. All are available by default on most Unix systems.
-
-To consider wrapping of lines that are longer than the terminal width the [`nowrap` command](https://github.com/goodell/nowrap) is needed. Without it, full physical lines will be counted, and this can lead to scrolling of output in the terminal.
+- `smartless` requires `bash`, common shell tools `cat`, `sed`, `rev`, `tac`, `tee`, `wc`, and a pager like `less`. All are available by default on most Unix systems.
+- To consider wrapping of lines that are longer than the terminal width the [`nowrap` command](https://github.com/goodell/nowrap) and `pkill` are needed. Without those, full physical lines will be counted, and this can lead to scrolling of output in the terminal.
+- For recalling captured output, `grep` is needed.
+- To save disk space by de-duplicating captures, the [`rdfind` command](https://rdfind.pauldreik.se/) is used if available.
 
 ## Installation
 
