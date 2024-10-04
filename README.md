@@ -1,6 +1,6 @@
 # smartless
 
-`smartless` is a pager that behaves just like `less`, but will show the file (or output) directly to the terminal if it is short enough to fit in the terminal height.  For longer files, the pager is still invoked, and only the leading and trailing lines will be kept in the terminal, with a truncation message in the middle.
+`smartless` is a pager that behaves just like `less`, but will show the file (or input) directly in the terminal if it is short enough to fit in the terminal height. For longer files (or if multiple files are passed), the pager is still invoked, and only the first and last few lines will be kept in the terminal (so everything is still visible without scrolling), with a truncation message in the middle. The full contents can optionally be recorded and later recalled via a short ID.
 
 Here is a small demo:
 
@@ -8,9 +8,9 @@ https://github.com/user-attachments/assets/89352bdf-cafd-491f-a185-82406b0272dd
 
 The original author (Stefan Heule) wrote a [blog post](http://stefanheule.com/blog/posts/2015-06-07/smartless-a-better-pager-for-small-and-large-inputs/) about his project.
 
-## Prerequisites
+## Dependencies
 
-`smartless` requires `bash`, `sed`, and a pager like `less`.  All are available by default on most Unix systems.
+`smartless` requires `bash`, `sed`, and a pager like `less`. All are available by default on most Unix systems.
 
 To consider wrapping of lines that are longer than the terminal width the [`nowrap` command](https://github.com/goodell/nowrap) is needed. Without it, full physical lines will be counted, and this can lead to scrolling of output in the terminal.
 
@@ -32,23 +32,23 @@ Download or clone the Git repository (cloning allows easy updating via `git pull
 cmd | smartless
 ```
 
-It is also possible to pass a filename directly:
+It is also possible to pass filename(s) directly:
 
 ```bash
 smartless file.txt
 ```
 
-Finally, all other parameters are forwarded to the pager.  For instance, `smartless +G` will jump to the end of the file in `less`.
+Multiple files will always launch the pager. All other parameters are forwarded to the pager. For instance, `smartless +G` will jump to the end of the file in `less`.
 
 ### Aliases
 
-To replace less completely, it is possible to define an alias in most shells.  For bash and zsh, the following line will allow the usage of `smartless` when typing `less`.
+To replace less completely, it is possible to define an alias in most shells. For bash and zsh, the following line will allow the usage of `smartless` when typing `less`.
 
 ```bash
 alias less='/path/to/smartless'
 ```
 
-It can be useful to define an additional alias for jumping directly to the end of the input.  I like to call that alias `more`, but other more descriptive names are imaginable:
+It can be useful to define an additional alias for jumping directly to the end of the input. I like to call that alias `more`, but other more descriptive names are imaginable:
 
 ```bash
 alias more='/path/to/smartless +G'
@@ -56,7 +56,7 @@ alias more='/path/to/smartless +G'
 
 ## Configuration
 
-Several optional environment variables control `smartless`.  These are described here, including their default values.
+Several optional environment variables control `smartless`. These are described here, including their default values.
 
 ```bash
 # number of lines to directly display before entering the pager
