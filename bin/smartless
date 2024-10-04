@@ -1,0 +1,399 @@
+#!/usr/bin/env bash
+
+# smartless - a pager similar to less, but smarter
+#
+# Works like the pager 'less', but does not enter the pager mode if the document
+# is short.
+# Inspired by http://unix.stackexchange.com/questions/107315/
+
+# ------------------------------------------------------------------------------
+
+# Copyright 2015 Stefan Heule
+# Copyright 2017-2024 Ingo Karkat
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ------------------------------------------------------------------------------
+
+# Number of lines to directly display before switching to less.
+if [ -z "$SMARTLESS_NUM_LINES" ] ; then
+    # Default to 5 lines less than the screen height.
+    [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
+    SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
+fi
+readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
+readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
+readonly beginLineNum=$((availableLineNum - endLineNum))
+
+[ -n "$COLUMNS" ] || COLUMNS=$(tput cols)
+
+: ${SMARTLESS_PAGER:=less} # pager to be used
+: ${SMARTLESS_PAGER_ARGUMENTS=-iR} # default arguments to the pager
+: ${SMARTLESS_RECALL_COMMAND=smartless-recall}  # hinted command name to recall full output
+: ${SMARTLESS_DIR_LISTER:=ls -l --} # command to show directory arguments (which are appended)
+
+# Highlighting of messages.
+: ${SMARTLESS_COLOR=$'\e[0;38;5;2m'}
+: ${SMARTLESS_COLOR_OFF=$'\e[0m'}
+
+# Clean up captured output after it hasn't been accessed for 14 days; any
+# arguments to "find" can be used here.
+: ${SMARTLESS_CAPTURE_PRUNE_FINDARGS='-atime +14'}
+
+getCaptureFilespec()
+{
+  mktemp --tmpdir="${SMARTLESS_CAPTURE_DIR}" "${SMARTLESS_CAPTURE_TEMPLATE:-XXXXXX}" 2>/dev/null || echo "${SMARTLESS_CAPTURE_DIR}/$$$RANDOM"
+}
+
+doCaptureHousekeeping()
+{
+  if [[ "$SMARTLESS_CAPTURE_PRUNE_FINDARGS" ]]; then
+    # Clean up old captures.
+    find "$SMARTLESS_CAPTURE_DIR" -maxdepth 1 $SMARTLESS_CAPTURE_PRUNE_FINDARGS -delete &> /dev/null
+  fi
+  if type -t rdfind >/dev/null; then
+    # Save disk space by de-duplicating previous (the current one may still be
+    # streamed in) captures via hard links.
+    rdfind -makehardlinks true -outputname /dev/null "$SMARTLESS_CAPTURE_DIR" &> /dev/null
+  fi
+}
+
+delegateToPager()
+{
+  exec $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}" -- "$@"
+}
+
+addeol()
+{
+  sed -e '$a'\\
+}
+
+reverse()
+{
+  reverseAnsi | rev | tac
+}
+
+estimateLineCount()
+{
+  local line="${1?}"; shift
+  # To get an upper bound for the line width without invoking external commands,
+  # expand tabs to 8 spaces and turn everything but non-printable ASCII
+  # characters into two spaces (so, assume it's a double-width character).
+  local lineWidth="${line//	/        }"
+  lineWidth="${lineWidth//[^ -~]/  }"
+  lineWidth=${#lineWidth}
+  printf %d $(((lineWidth - 1) / COLUMNS + 1))
+}
+
+prePagerPipelineStep=
+if type -t nowrap >/dev/null; then
+  killUselessPager()
+  {
+    tee  >(
+      wrappedLineNum=$(nowrap --columns="$COLUMNS" --wrap | wc --lines)
+      [ -n "$wrappedLineNum" ] && [ $wrappedLineNum -le $SMARTLESS_NUM_LINES ] \
+          && pkill --parent "$SCRIPT_PID" --exact -- "$SMARTLESS_PAGER"
+    )
+  }
+  prePagerPipelineStep=killUselessPager
+
+  typeset -a NOWRAP=()
+  countNetLines()
+  {
+    netLineCnt=$(estimateLineCount "$line")
+    [ $# -eq 0 -a $netLineCnt -le 1 ] && return
+
+
+    # Lazily start a coproc to filter individual lines; this is much more
+    # efficient than starting a new process for each line.
+    if [ ${#NOWRAP[@]} -eq 0 ]; then
+      coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
+    fi
+
+    # Append an empty line; the single line's wrapped output will never create a
+    # fully empty line on its own, so when we read an empty line, we know that the
+    # end of the current wrapped line has been reached.
+    printf '%s\n\n' "$line" >&"${NOWRAP[1]}"
+
+    local wrappedLine
+    netLineCnt=0
+    netLines=''
+    while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
+    do
+      if [ $# -gt 0 ] && [ $netLineCnt -lt $1 ]; then
+        netLines+="$wrappedLine"
+      fi
+      let netLineCnt+=1
+    done
+  }
+else
+  countNetLines()
+  {
+    # Manually remove ANSI escape sequences.
+    # The estimate errs on the larger side.
+    let netLineCnt=$(estimateLineCount "${line//\[*([0-9:;?])[a-zA-Z]/}")
+
+    if [ $# -gt 0 ]; then
+      netLines+="${line:0:$((($1 - 1) * COLUMNS))}"
+    fi
+  }
+fi
+
+shownCompleteLines=
+wrappedLineCnt=0
+isTruncated=
+lineRemainder=
+
+handleHead()
+{
+  local shownLineCnt=0
+  while IFS=$'\n' read -r line; do
+    countNetLines
+    if ((shownLineCnt + netLineCnt <= beginLineNum)); then
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: taking in full";; esac
+      shownCompleteLines+="${line}"$'\n'
+      printf '%s\n' "$line"
+      line=''
+      let shownLineCnt+=netLineCnt
+      let wrappedLineCnt+=netLineCnt-1
+    else
+      # Too long; only print what fits the terminal and show in full in pager.
+      availableLines=$((beginLineNum - shownLineCnt))
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: I already had $shownLineCnt, now $netLineCnt and available $availableLines";; esac
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      lineRemainder="$line"$'\n'
+      line=''
+      break
+    fi
+  done
+  # Incomplete line without newline.
+  if [ -n "$line" ]; then
+    countNetLines
+    if ((shownLineCnt + netLineCnt < beginLineNum)); then
+      # Short enough to show completely.
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: taking incomplete in full";; esac
+      earlyIncompleteLine="$line"
+      line=''
+    else
+      # Too long; only print what fits the terminal and show in full in pager.
+      availableLines=$((beginLineNum - shownLineCnt))
+      case ",${DEBUG:-}," in *,smartless:head,*) echo >&2 "${PS4}smartless: I already had $shownLineCnt, now incomplete $netLineCnt and available $availableLines";; esac
+      countNetLines $availableLines; [ -z "$netLines" ] || printf '%s' "$netLines"
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      lineRemainder="$line"
+      line=''
+    fi
+  fi
+}
+
+captureHead()
+{
+  if [ -n "$SMARTLESS_RECALL_COMMAND" ] && [[ -d "$SMARTLESS_CAPTURE_DIR" ]]; then
+    captureFilespec="$(getCaptureFilespec)"
+
+    # Run housekeeping jobs in the background, to avoid blocking the output.
+    ( doCaptureHousekeeping ) &
+
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_RECALL_COMMAND" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  else
+    captureFilespec="$(mktemp --tmpdir "$(basename -- "$0")-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/$(basename -- "$0").$$$RANDOM")"
+    trap 'rm -f -- "$captureFilespec" 2>/dev/null' EXIT
+    printf -v truncationMessage '%s... (full output truncated) ...%s' "$SMARTLESS_COLOR" "$SMARTLESS_COLOR_OFF"
+  fi
+  printf '%s%s' "$shownCompleteLines" "$line" > "$captureFilespec"
+}
+
+feedPager()
+{
+  printf '%s%s' "$shownCompleteLines" "$line"
+  tee --append -- "$captureFilespec"
+}
+
+handleTail()
+{
+  # The handling of wrapped lines only works forward, so we need to reverse both
+  # lines and characters. Therefore, these cannot be directly printed, but need
+  # to be collected and reversed again. The algorithm is the same as at the
+  # front, but we don't need to handle incomplete lines without a newline here.
+  collectedLineCnt=0
+  collectedLines=''
+
+  # Don't repeat content already shown from the beginning.
+  alreadyShownContent="${shownCompleteLines}${netLines}"
+  byteOffset=$(printf %s "$alreadyShownContent" | wc --bytes)
+  alreadyShownNetlines="$netLines"
+
+  while IFS=$'\n' read -r line; do
+    collectedLinesWithoutTruncation=''
+    countNetLines
+    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: I already had $collectedLineCnt, now $netLineCnt and available $endLineNum";; esac
+    if ((collectedLineCnt + netLineCnt == endLineNum + 1)); then
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation";; esac
+      collectedLinesWithoutTruncation="${collectedLines}${line}"$'\n'
+    elif ((collectedLineCnt + netLineCnt <= endLineNum)); then
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: taking in full";; esac
+      collectedLines+="${line}"$'\n'
+      let collectedLineCnt+=netLineCnt
+      let wrappedLineCnt+=netLineCnt-1
+    else
+      # Too long; only collect what fits the terminal.
+      availableLines=$((endLineNum - collectedLineCnt))
+      countNetLines $availableLines; collectedLines+="$netLines"$'\n'
+      let wrappedLineCnt+=availableLines-1
+      [ $availableLines -lt $netLineCnt ] && isTruncated=t
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
+      break
+    fi
+  done < <(
+    tail --bytes=+$((byteOffset + 1)) -- "$captureFilespec" \
+      | tail --lines=$((endLineNum + 1)) \
+      | addeol \
+      | reverse # Reverse both lines and characters.
+  )
+  totalLineNum=$(addeol < "$captureFilespec" | wc --lines)  # wc does not count incomplete lines.
+
+  if [ "$isTruncated" ]; then
+    # Check whether the already shown content plus the collected content for
+    # trailing lines makes up the entire file. If that's the case, there's been
+    # wrapping, but no truncation.
+    tmpCollectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
+    tmpCollectedBytes=$(printf %s "$tmpCollectedLines" | wc --bytes)
+    totalBytes="$(wc --bytes -- "$captureFilespec")"; totalBytes=${totalBytes%% *}
+    ((byteOffset + tmpCollectedBytes == totalBytes)) && isTruncated=
+    case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: $byteOffset + $tmpCollectedBytes = $((byteOffset + tmpCollectedBytes)) and $totalBytes${isTruncated:+, truncated}";; esac
+  fi
+
+  if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
+    printf "${alreadyShownNetlines:+\n}%s\\n" "$truncationMessage"
+  elif [ ! "$isTruncated" ]; then
+    collectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
+  fi
+  printf %s "$collectedLines" | reverse # Undo the reversal of both lines and characters.
+
+  case ",${DEBUG:-}," in
+    *,smartless:files,*)
+      printf %s "$collectedLines" > ~/tmp/smartless/collectedLinesOrig
+      printf %s "$collectedLinesWithoutTruncation" | reverse > ~/tmp/smartless/collectedLinesWithoutTruncation
+      printf %s "$collectedLines" | reverse > ~/tmp/smartless/collectedLines
+      printf %s "$alreadyShownContent" > ~/tmp/smartless/alreadyShownContent
+      cp "$captureFilespec" ~/tmp/smartless/captureFilespec
+      ;;
+  esac
+}
+
+truncateFile()
+{
+  handleHead < "$captureFilespec"
+
+  if [ -n "$SMARTLESS_RECALL_COMMAND" ] && [ -n "$SMARTLESS_CAPTURE_DIR" ] && [ "$(dirname -- "$captureFilespec")" = "$SMARTLESS_CAPTURE_DIR" ]; then
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_RECALL_COMMAND" "$(basename -- "$captureFilespec")" "${SMARTLESS_COLOR_OFF}"
+  else
+    printf -v truncationMessage '%s... recall full output via $ %s %q%s' "$SMARTLESS_COLOR" "$SMARTLESS_PAGER" "$captureFilespec" "${SMARTLESS_COLOR_OFF}"
+  fi
+
+  handleTail
+}
+
+readonly SCRIPT_PID=$$
+hasNonFiles=
+typeset -a lessArgs=()
+typeset -a filespecs=()
+typeset -a tempFilespecs=()
+while [ $# -ne 0 ]
+do
+  case "$1" in
+    -[bhjkoOpPtTxyz#])    lessArgs+=("$1" "$2"); shift; shift;;
+    -[bhjkoOpPtTxyz#]?*)  lessArgs+=("$1"); shift;;
+    -)                    filespecs+=("$1"); shift; hasNonFiles=t;;
+    --)                   shift; break;;
+    --get-filespec)       shift; getCaptureFilespec; exit;;
+    --do-housekeeping)    shift; doCaptureHousekeeping; exit;;
+    --truncate-only)      shift; captureFilespec="${1:?}"; shift; truncateFile; exit;;
+    --quit-if-one-screen|-F)
+                          printf >&2 'Note: Omitting %s flag as that would interfere with smartless.\n' "$1"
+                          shift
+                          ;;
+    --*)                  lessArgs+=("$1"); shift;;
+    [-+]*)                lessArgs+=("$1"); shift;;
+    *)                    fileArg="$1"; shift
+                          if [ -f "$fileArg" ]; then
+                            :
+                          elif [ -d "$fileArg" ]; then
+                            # Add a header with the dirspec (like ls -l does) if there are more than one
+                            # FILE arguments.
+                            isDirListerHeader=; [ ${#filespecs[@]} -eq 0 -a $# -eq 0 ] || isDirListerHeader=t
+
+                            prefix='smartless'; type -t pathAsFilename >/dev/null && prefix="$(pathAsFilename --encode -- "$fileArg")"
+                            tempFile="$(mktemp --tmpdir "${prefix}-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/${prefix}.$$$RANDOM")"
+
+                            { eval "${isDirListerHeader:+printf %s:\\\\n \"\$fileArg\"; }$SMARTLESS_DIR_LISTER \"\$fileArg\""; } > "$tempFile" 2>&1
+                            tempFilespecs+=("$tempFile")
+                            fileArg="$tempFile"
+                            [ "${DEBUG:-}" ] || trap 'rm -f -- "${tempFilespecs[@]}" 2>/dev/null' EXIT
+                          else
+                            hasNonFiles=t
+                          fi
+                          filespecs+=("$fileArg")
+                          ;;
+  esac
+done
+set -- "${filespecs[@]}" "$@"
+
+# Skip when output is not to a terminal, but instead smartless is used inside a pipe.
+[ -t 1 ] || exec cat "$@"
+
+if [ $# -gt 0 ] && [ ! "$hasNonFiles" ]; then
+  if [ $(cat -- "$@" 2>/dev/null | wc -l) -gt $SMARTLESS_NUM_LINES ]; then
+    delegateToPager "$@"
+  else
+    cat -- "$@" | "${BASH_SOURCE[0]}" "${lessArgs[@]}"
+    exit $?
+  fi
+elif [ "$hasNonFiles" ]; then
+  if [ $# -gt 1 ]; then
+    delegateToPager "$@"  # Note: Non-regular files will require -f|--force.
+  elif [ "$1" != '-' ]; then
+    # stdin will be read automatically; other non-regular file needs to be opened.
+    { exec < "$1"; } 2>/dev/null || {
+      status=$?
+      printf >&2 'smartless: %s: No such file or directory\n' "$1"
+      exit $status
+    }
+  fi
+fi
+
+# Read and display enough lines to fill (almost) half of the terminal.
+handleHead
+
+# If the input is longer, run the pager.
+if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
+  || { IFS=$'\n' read -r line && line+=$'\n'; }
+then
+  captureHead
+  eval 'feedPager' \
+    "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
+    | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
+
+  # Fill the second half of the terminal with trailing lines.
+  handleTail
+else
+  printf '%s%s' "$earlyIncompleteLine" "$line"
+fi
+
+if [ ${#NOWRAP[@]} -gt 0 ]; then
+  # Close the coproc.
+  eval "exec ${NOWRAP[1]}>&-"
+fi
