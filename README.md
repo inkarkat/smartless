@@ -16,17 +16,13 @@ To consider wrapping of lines that are longer than the terminal width the [`nowr
 
 ## Installation
 
-The simplest way to install the script is to download it directly into `/usr/local/bin`:
+Download or clone the Git repository (cloning allows easy updating via `git pull`):
 
-    curl https://raw.githubusercontent.com/inkarkat/smartless/master/smartless -o /usr/local/bin/smartless
-    chmod +x /usr/local/bin/smartless # <-- mark it as executable
-
-Alternatively, you can clone the git repository, which allows easy updating by doing `git pull`:
-
-    git clone https://github.com/inkarkat/smartless.git
-    ln -s smartless/smartless /usr/local/bin/smartless # <-- make it available system-wide as "smartless"
+    git clone [--branch stable] https://github.com/inkarkat/smartless.git
     
-See also the [aliases](#aliases) section below.
+- The `./bin` subdirectory is supposed to be added to `PATH`.
+- The optional `./profile/exports.sh` script sets up the pager and capture directory. It needs to be sourced from a shell startup script (e.g. `.profile` or `.bashrc`).
+- Also see the [aliases](#aliases) section below.
 
 ## Usage
 
