@@ -2,9 +2,11 @@
 
 `smartless` is a pager that behaves just like `less`, but will show the file (or output) directly to the terminal if it is short enough to fit in the terminal height.  For longer files, the pager is still invoked, and only the leading and trailing lines will be kept in the terminal, with a truncation message in the middle.
 
-Here is a small demo, and I have also written a [blog post](http://stefanheule.com/blog/posts/2015-06-07/smartless-a-better-pager-for-small-and-large-inputs/) about this project.
+Here is a small demo:
 
-![smartless demo](http://stefanheule.com/blog/img/posts/smartless.gif)
+https://github.com/user-attachments/assets/89352bdf-cafd-491f-a185-82406b0272dd
+
+The original author (Stefan Heule) wrote a [blog post](http://stefanheule.com/blog/posts/2015-06-07/smartless-a-better-pager-for-small-and-large-inputs/) about his project.
 
 ## Prerequisites
 
