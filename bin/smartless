@@ -96,6 +96,12 @@ estimateLineCount()
 }
 
 prePagerPipelineStep=
+typeset -a NOWRAP=()
+closeNowrapCoproc()
+{
+  [ ${#NOWRAP[@]} -eq 0 ] \
+    || exec {NOWRAP[0]}>&- {NOWRAP[1]}>&-; NOWRAP=()
+}
 nowrapReverser=''
 if type -t nowrap >/dev/null; then
   killUselessPager()
@@ -108,7 +114,6 @@ if type -t nowrap >/dev/null; then
   }
   prePagerPipelineStep=killUselessPager
 
-  typeset -a NOWRAP=()
   countNetLines()
   {
     netLineCnt=$(estimateLineCount "$line")
@@ -214,7 +219,7 @@ handleHead()
       line=''
     fi
   fi
-  [ ${#NOWRAP[@]} -eq 0 ] || exec {NOWRAP[0]}>&- {NOWRAP[1]}>&-; NOWRAP=()
+  closeNowrapCoproc
 }
 
 captureHead()
@@ -412,8 +417,5 @@ then
 else
   printf '%s%s' "$earlyIncompleteLine" "$line"
 fi
-
-if [ ${#NOWRAP[@]} -gt 0 ]; then
-  # Close the coproc.
-  eval "exec ${NOWRAP[1]}>&-"
-fi
+closeNowrapCoproc
+exit 0
