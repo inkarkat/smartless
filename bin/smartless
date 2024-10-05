@@ -259,7 +259,21 @@ handleTail()
   byteOffset=$(printf %s "$alreadyShownContent" | wc --bytes)
   alreadyShownNetlines="$netLines"
 
-  nowrapReverser='stdbuf -oL rev'
+  nowrapReverser=; if which stdbuf >/dev/null 2>&1; then
+    nowrapReverser='stdbuf -oL rev'
+  elif which unbuffer >/dev/null 2>&1; then
+    nowrapReverser='unbuffer rev'
+  else
+    unbuffer()
+    {
+      while IFS=$'\n' read -r line || [ -n "$line" ]
+      do
+        printf '%s\n' "$line" | "$@"
+      done
+    }
+    nowrapReverser='unbuffer rev'
+  fi
+
   while IFS=$'\n' read -r line; do
     collectedLinesWithoutTruncation=''
     countNetLines
