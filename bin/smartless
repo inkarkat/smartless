@@ -260,11 +260,11 @@ handleTail()
     countNetLines
     case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: I already had $collectedLineCnt, now $netLineCnt and available $endLineNum";; esac
     if ((collectedLineCnt + netLineCnt == endLineNum + 1)); then
-      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation";; esac
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: have $netLineCnt, only $availableLines available, but would fit without truncation: ${line@Q}";; esac
       collectedLinesWithoutTruncation="${collectedLines}${line}"$'\n'
       break
     elif ((collectedLineCnt + netLineCnt <= endLineNum)); then
-      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: taking in full";; esac
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: taking in full: ${line@Q}";; esac
       collectedLines+="${line}"$'\n'
       let collectedLineCnt+=netLineCnt
       let wrappedLineCnt+=netLineCnt-1
@@ -274,7 +274,7 @@ handleTail()
       countNetLines $availableLines; collectedLines+="$(printf %s "$netLines" | reverse)"$'\n'  # The unwrapped netLines part had been un-reversed; we need to re-reverse them for the final reversal.
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
-      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
+      case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}: ${line@Q}";; esac
       break
     fi
   done < <(
