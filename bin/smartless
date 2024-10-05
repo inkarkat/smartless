@@ -80,7 +80,7 @@ addeol()
 
 reverse()
 {
-  reverseAnsi | rev | tac
+  rev | tac
 }
 
 estimateLineCount()
@@ -96,6 +96,7 @@ estimateLineCount()
 }
 
 prePagerPipelineStep=
+nowrapReverser=''
 if type -t nowrap >/dev/null; then
   killUselessPager()
   {
@@ -117,7 +118,7 @@ if type -t nowrap >/dev/null; then
     # Lazily start a coproc to filter individual lines; this is much more
     # efficient than starting a new process for each line.
     if [ ${#NOWRAP[@]} -eq 0 ]; then
-      coproc NOWRAP { nowrap --unbuffered --columns="$COLUMNS" --wrap; }
+      coproc NOWRAP { eval "${nowrapReverser}${nowrapReverser:+|}" 'nowrap --unbuffered --columns="$COLUMNS" --wrap'; }
     fi
 
     # Append an empty line; the single line's wrapped output will never create a
@@ -127,24 +128,40 @@ if type -t nowrap >/dev/null; then
 
     local wrappedLine
     netLineCnt=0
-    netLines=''
+    typeset -a wrappedLines=()
     while IFS=$'\n' read -r -u "${NOWRAP[0]}" wrappedLine && [ -n "$wrappedLine" ]
     do
-      if [ $# -gt 0 ] && [ $netLineCnt -lt $1 ]; then
-        netLines+="$wrappedLine"
-      fi
+      wrappedLines+=("$wrappedLine")
       let netLineCnt+=1
     done
+
+    if [ $# -gt 0 ]; then
+      if [ -n "$nowrapReverser" ]; then
+        printf -v netLines %s "${wrappedLines[@]:(-$1)}" # Take the last $1 lines.
+      else
+        printf -v netLines %s "${wrappedLines[@]:0:$1}" # Take the first $1 lines.
+      fi
+    fi
   }
 else
   countNetLines()
   {
     # Manually remove ANSI escape sequences.
     # The estimate errs on the larger side.
-    let netLineCnt=$(estimateLineCount "${line//\[*([0-9:;?])[a-zA-Z]/}")
+    if [ -n "$nowrapReverser" ]; then
+      # Optimization: Instead of using just the reverser in a coproc, simply reverse
+      # the pattern to match reversed ANSI escape sequences.
+      let netLineCnt=$(estimateLineCount "${line//[a-zA-Z]*([0-9:;?])\[/}")
 
-    if [ $# -gt 0 ]; then
-      netLines+="${line:0:$((($1 - 1) * COLUMNS))}"
+      if [ $# -gt 0 ]; then
+        netLines="${line:(-$((($1 - 1) * COLUMNS)))}"
+      fi
+    else
+      let netLineCnt=$(estimateLineCount "${line//\[*([0-9:;?])[a-zA-Z]/}")
+
+      if [ $# -gt 0 ]; then
+        netLines="${line:0:$((($1 - 1) * COLUMNS))}"
+      fi
     fi
   }
 fi
@@ -197,6 +214,7 @@ handleHead()
       line=''
     fi
   fi
+  [ ${#NOWRAP[@]} -eq 0 ] || exec {NOWRAP[0]}>&- {NOWRAP[1]}>&-; NOWRAP=()
 }
 
 captureHead()
@@ -236,6 +254,7 @@ handleTail()
   byteOffset=$(printf %s "$alreadyShownContent" | wc --bytes)
   alreadyShownNetlines="$netLines"
 
+  nowrapReverser='stdbuf -oL rev'
   while IFS=$'\n' read -r line; do
     collectedLinesWithoutTruncation=''
     countNetLines
@@ -252,7 +271,7 @@ handleTail()
     else
       # Too long; only collect what fits the terminal.
       availableLines=$((endLineNum - collectedLineCnt))
-      countNetLines $availableLines; collectedLines+="$netLines"$'\n'
+      countNetLines $availableLines; collectedLines+="$(printf %s "$netLines" | reverse)"$'\n'  # The unwrapped netLines part had been un-reversed; we need to re-reverse them for the final reversal.
       let wrappedLineCnt+=availableLines-1
       [ $availableLines -lt $netLineCnt ] && isTruncated=t
       case ",${DEBUG:-}," in *,smartless:truncate,*) echo >&2 "${PS4}smartless: too long; have $netLineCnt, but only $availableLines available${isTruncated:+, truncated}";; esac
