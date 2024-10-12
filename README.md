@@ -4,7 +4,7 @@
 
 Here is a small demo:
 
-https://github.com/user-attachments/assets/89352bdf-cafd-491f-a185-82406b0272dd
+[![asciicast](https://asciinema.org/a/680606.svg)](https://asciinema.org/a/680606)
 
 The original author (Stefan Heule) wrote a [blog post](http://stefanheule.com/blog/posts/2015-06-07/smartless-a-better-pager-for-small-and-large-inputs/) about his project.
 
@@ -20,7 +20,7 @@ The original author (Stefan Heule) wrote a [blog post](http://stefanheule.com/bl
 Download or clone the Git repository (cloning allows easy updating via `git pull`):
 
     git clone [--branch stable] https://github.com/inkarkat/smartless.git
-    
+
 - The `./bin` subdirectory is supposed to be added to `PATH`.
 - The optional `./profile/exports.sh` script sets up the pager and capture directory. It needs to be sourced from a shell startup script (e.g. `.profile` or `.bashrc`).
 - Also see the [aliases](#aliases) section below.
