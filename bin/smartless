@@ -424,7 +424,7 @@ then
   captureHead
 
   headTailSeparator=$'\n'
-  if [ "$isTruncated" ] && [ $availableLines -gt 0 -a $netLineCnt -gt 1 ]; then
+  if [ $availableLines -lt $netLineCnt -a $availableLines -gt 0 -a $netLineCnt -gt 1 ]; then
       headTailSeparator=''
       printf '\n'
   fi
