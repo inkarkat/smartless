@@ -31,6 +31,7 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
+[ $SMARTLESS_NUM_LINES -ge 1 ] || SMARTLESS_NUM_LINES=1 # Need at least one line for the truncation message.
 readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
 readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
 readonly beginLineNum=$((availableLineNum - endLineNum))
