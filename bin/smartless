@@ -31,6 +31,7 @@ if [ -z "$SMARTLESS_NUM_LINES" ] ; then
     [ -n "$LINES" ] || LINES=$(tput lines 2>/dev/null)
     SMARTLESS_NUM_LINES=$((${LINES:-20} - 5))
 fi
+[ $SMARTLESS_NUM_LINES -ge 1 ] || SMARTLESS_NUM_LINES=1 # Need at least one line for the truncation message.
 readonly availableLineNum=$((SMARTLESS_NUM_LINES - 1))  # Reserve one line for the truncation message.
 readonly endLineNum=$((availableLineNum / 2))  # One surplus line goes to the end.
 readonly beginLineNum=$((availableLineNum - endLineNum))
@@ -316,7 +317,7 @@ handleTail()
   fi
 
   if [ "$isTruncated" ] || ((totalLineNum + wrappedLineCnt > SMARTLESS_NUM_LINES)); then
-    printf "${alreadyShownNetlines:+\n}%s\\n" "$truncationMessage"
+    printf "${alreadyShownNetlines:+$headTailSeparator}%s\\n" "$truncationMessage"
   elif [ ! "$isTruncated" ]; then
     collectedLines="${collectedLinesWithoutTruncation:-$collectedLines}"
   fi
@@ -422,6 +423,13 @@ if { [ -n "$lineRemainder" ] && line="$lineRemainder"; } \
   || { IFS=$'\n' read -r line && line+=$'\n'; }
 then
   captureHead
+
+  headTailSeparator=$'\n'
+  if [ $availableLines -lt $netLineCnt -a $availableLines -gt 0 -a $netLineCnt -gt 1 ]; then
+      headTailSeparator=''
+      printf '\n'
+  fi
+
   eval 'feedPager' \
     "${prePagerPipelineStep:+|}$prePagerPipelineStep" \
     | $SMARTLESS_PAGER $SMARTLESS_PAGER_ARGUMENTS "${lessArgs[@]}"
