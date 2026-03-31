@@ -4,7 +4,6 @@ shopt -qs extglob
 
 : ${SMARTLESSRECALL_COMMAND_JOINER=;}
 : ${SMARTLESSRECALL_EXEC_END=;}
-: ${SMARTLESSRECALL_GREP_END=;}
 : ${SMARTLESSRECALL_FILE_MARKER='{}'}
 fileMarker="$SMARTLESSRECALL_FILE_MARKER"; unset SMARTLESSRECALL_FILE_MARKER
 
@@ -12,8 +11,8 @@ printShortUsage()
 {
     # Note: short followed by long option; if the user knows the short one, she can
     # skim the long one.
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[\"\"|N|NAME|NAME-GLOB|[N] PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [-?|-h|--help]"
-    printf 'Usage: %q %s\n' "$(basename "$1")" "[--recapture] -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] --grep GREP-ARGS ... ${SMARTLESSRECALL_GREP_END}] [COMMAND-ARGS ...]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[\"\"|N|NAME|NAME-GLOB|[N] [GREP-ARGS ...] PATTERN] [-?|-h|--help]"
+    printf 'Usage: %q %s\n' "$(basename "$1")" "[--recapture] -c|--command \"COMMANDLINE\" [...] | --exec SIMPLECOMMAND [...]${fileMarker:+ [}${fileMarker}${fileMarker:+] [...]} ${SMARTLESSRECALL_EXEC_END} [--exec ...] [\"\"|N|NAME|NAME-GLOB|PATTERN|[N] GREP-ARGS ... PATTERN] [COMMAND-ARGS ...]"
 }
 printUsage()
 {
@@ -37,10 +36,8 @@ HELPDESCRIPTION
     printShortUsage "$1"
     echo
     cat <<HELPTEXT
-    --grep GREP-ARGS [...] ${SMARTLESSRECALL_GREP_END}
-			Recall the newest capture file that matches GREP-ARGS;
-			all following arguments are taken to be grep arguments
-			until an argument consisting of '${SMARTLESSRECALL_GREP_END}' is encountered.
+    GREP-ARGS [...]	Recall the newest capture file whose contents are
+			matched by GREP-ARGS.
     --recapture		If COMMAND(s) invoke smartless themselves (on the
 			recalled output), do capture that as well. By default,
 			captures are turned off to allow repeated recalls of the
@@ -113,25 +110,17 @@ do
 			shift
 			commands+="${commands:+ $SMARTLESSRECALL_COMMAND_JOINER }${cmd}"
 			;;
-	--grep)		shift
-			typeset -a grepArgs=()
-			while [ $# -gt 0 -a "$1" != "$SMARTLESSRECALL_GREP_END" ]
-			do
-			    grepArgs+=("$1")
-			    shift
-			done
-			if [ $# -eq 0 ]; then
-			    echo "ERROR: --grep must be concluded with '${SMARTLESSRECALL_GREP_END}'"; echo; printUsage "$0"
-			    exit 2
-			fi >&2
-			shift
-			if [ ${#grepArgs[@]} -eq 0 ]; then
-			    echo 'ERROR: --grep must be followed by at least one GREP-ARG.'; echo; printUsage "$0"
-			    exit 2
-			fi >&2
-			haveMatcher=t
-			filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
-			;;
+
+	-@([EFGPivwxsaIrRUz]))
+			grepArgs+=("$1"); shift; haveMatcher=t;;
+	--@(extended-regexp|fixed-strings|basic-regexp|perl-regexp|ignore-case|invert-match|word-regexp|line-regexp|no-messages|text|recursive|dereference-recursive|binary|null-data))
+			grepArgs+=("$1"); shift; haveMatcher=t;;
+	-[efmDd])	grepArgs+=("$1" "${2?}"); shift; shift; haveMatcher=t;;
+	--@(regexp|file|color|colour|max-count|binary-files|devices|directories|exclude|exclude-from|include)=*)
+			grepArgs+=("$1"); shift; haveMatcher=t;;
+	--@(regexp|file|color|colour|max-count|binary-files|devices|directories|exclude|exclude-from|include))
+			grepArgs+=("$1" "${2?}"); shift; shift; haveMatcher=t;;
+
 	*)		if [ "$haveMatcher" ]; then
 			    commandArgs+=("$1")
 			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
@@ -161,7 +150,7 @@ do
 				commandArgs+=("$1")
 			    else
 				# Take the newest / N'th matching file.
-				filespec="$(recallGrep "$1")"
+				filespec="$(recallGrep -e "$1")"
 			    fi
 			    haveMatcher=t
 			fi
@@ -169,7 +158,9 @@ do
 			;;
     esac
 done
-if [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
+if [ ${#grepArgs[@]} -gt 0 ]; then
+    filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
+elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
     filespec="$(recallByNumber 1)"
 fi
 if [ -z "$filespec" ]; then
