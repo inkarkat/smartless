@@ -42,11 +42,13 @@ HELPDESCRIPTION
 			recalled output), do capture that as well. By default,
 			captures are turned off to allow repeated recalls of the
 			same output.
-    --command|-c CMD	Execute CMD as a command-line.${fileMarker:+ The string $fileMarker is
-			replaced by the recalled output file.}
+    --command|-c CMD	Execute CMD as a command-line. The recalled output file
+			${fileMarker:+either }is appended${fileMarker:+ or replaces any $fileMarker marker} inside
+			COMMANDLINE.
     --exec CMD [...] ${SMARTLESSRECALL_EXEC_END}	Execute CMD; all following arguments are taken to be
 			arguments to the CMD until an argument consisting of
-			'${SMARTLESSRECALL_EXEC_END}' is encountered.${fileMarker:+ The string $fileMarker is replaced by the
+			'${SMARTLESSRECALL_EXEC_END}' is encountered. The recalled output file ${fileMarker:+either }is
+			appended${fileMarker:+ or replaces any $fileMarker marker} inside COMMANDLINE.
 			recalled output file.}
 HELPTEXT
 }
