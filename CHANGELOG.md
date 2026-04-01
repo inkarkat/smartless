@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 2.0.3 - RELEASEME
 ### Changed
 - smartless-recall directly parses grep arguments without requiring wrapping those in --grep GREP-ARGS ... ; - that's too cumbersome and hard to remember.
+### Fixed
+- smartless-recall ignores any directories in `SMARTLESS_CAPTURE_DIR` and handles a completely empty directory
 
 ## 2.0.2 - 11-Feb-2025
 ### Fixed

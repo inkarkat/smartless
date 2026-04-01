@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o pipefail
-shopt -qs extglob
+shopt -qs extglob nullglob
 
 : ${SMARTLESSRECALL_COMMAND_JOINER=;}
 : ${SMARTLESSRECALL_EXEC_END=;}
@@ -68,7 +68,7 @@ getCaptures()
 {
     ensureCaptureDir || return $?
     readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
-    if [ ${#captures[@]} -eq 0 ]; then
+    if [ ${#captures[@]} -eq 0 ] || [ ${#captures[@]} -eq 1 -a "${captures[0]}" = . ]; then
 	printf >&2 'ERROR: No captured outputs in %s\n' "$SMARTLESS_CAPTURE_DIR"
 	exit 2
     fi
