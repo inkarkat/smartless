@@ -64,6 +64,7 @@ ensureCaptureDir()
 
 getCaptures()
 {
+    ensureCaptureDir || return $?
     readarray -t captures < <(ls -d -t "$SMARTLESS_CAPTURE_DIR"/*)
     if [ ${#captures[@]} -eq 0 ]; then
 	printf >&2 'ERROR: No captured outputs in %s\n' "$SMARTLESS_CAPTURE_DIR"
@@ -73,14 +74,15 @@ getCaptures()
 
 recallByNumber()
 {
-    getCaptures
-    printf %s "${captures[${1:?} - 1]}"
+    getCaptures \
+	&& printf %s "${captures[${1:?} - 1]}"
 }
 
 recallGrep()
 {
-    getCaptures	# Note: Cannot simply use $SMARTLESS_CAPTURE_DIR/* glob here because we want to return a match in the newest capture.
-    grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
+    # Note: Cannot simply use $SMARTLESS_CAPTURE_DIR/* glob here because we want to return a match in the newest capture.
+    getCaptures \
+	&& grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
 }
 
 isRecapture=
@@ -124,15 +126,13 @@ do
 	*)		if [ "$haveMatcher" ]; then
 			    commandArgs+=("$1")
 			elif [ -z "$count" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
-			    ensureCaptureDir || exit $?
 			    # Number means N'th recent capture, but could also index into multiple results.
 			    count="$1"
-			    filespec="$(recallByNumber "$1")"
+			    filespec="$(recallByNumber "$1")" || exit $?
 			else
-			    ensureCaptureDir || exit $?
 			    if [ -z "$1" ]; then
 				# Empty argument means first capture, matcher done, following arguments are COMMAND-ARGS.
-				filespec="$(recallByNumber 1)"
+				filespec="$(recallByNumber 1)" || exit $?
 			    elif [[ "$1" =~ ^[0-9]+$ ]]; then
 				printUsage >&2 "$0"
 				exit 2
@@ -150,7 +150,7 @@ do
 				commandArgs+=("$1")
 			    else
 				# Take the newest / N'th matching file.
-				filespec="$(recallGrep -e "$1")"
+				filespec="$(recallGrep -e "$1")" || exit $?
 			    fi
 			    haveMatcher=t
 			fi
@@ -159,11 +159,9 @@ do
     esac
 done
 if [ ${#grepArgs[@]} -gt 0 ]; then
-    ensureCaptureDir || exit $?
     filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
 elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
-    ensureCaptureDir || exit $?
-    filespec="$(recallByNumber 1)"
+    filespec="$(recallByNumber 1)" || exit $?
 fi
 if [ -z "$filespec" ]; then
     echo >&2 'ERROR: No such captured output.'
