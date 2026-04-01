@@ -82,7 +82,7 @@ recallGrep()
 {
     # Note: Cannot simply use $SMARTLESS_CAPTURE_DIR/* glob here because we want to return a match in the newest capture.
     getCaptures \
-	&& grep --no-messages --files-with-matches "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
+	&& grep --no-messages --files-with-matches --directories=skip "$@" -- "${captures[@]}" | sed -ne "${count:-1}p"
 }
 
 isRecapture=
