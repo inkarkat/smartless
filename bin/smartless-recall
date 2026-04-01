@@ -159,8 +159,10 @@ do
     esac
 done
 if [ ${#grepArgs[@]} -gt 0 ]; then
+    ensureCaptureDir || exit $?
     filespec="$(recallGrep "${grepArgs[@]}")" || exit $?
 elif [ -z "$filespec" ] && [ -z "$count" ] && [ ! "$haveMatcher" ]; then
+    ensureCaptureDir || exit $?
     filespec="$(recallByNumber 1)"
 fi
 if [ -z "$filespec" ]; then
