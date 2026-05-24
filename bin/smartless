@@ -101,7 +101,7 @@ typeset -a NOWRAP=()
 closeNowrapCoproc()
 {
   [ ${#NOWRAP[@]} -eq 0 ] \
-    || exec {NOWRAP[0]}>&- {NOWRAP[1]}>&-; NOWRAP=()
+    || exec {NOWRAP[1]}>&- {NOWRAP[0]}<&-; NOWRAP=()
 }
 nowrapReverser=''
 if type -t nowrap >/dev/null; then
